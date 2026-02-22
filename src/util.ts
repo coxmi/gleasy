@@ -1,0 +1,14 @@
+import type { TypedArray, GLType } from "./types.ts"
+
+export type Expand<T> = T extends infer O ? { [K in keyof O]: O[K] } : never
+
+export function glTypeFromTypedArray(gl: WebGL2RenderingContext, arr: TypedArray): GLType {
+    if (arr instanceof Float32Array) return gl.FLOAT
+    if (arr instanceof Int32Array) return gl.INT
+    if (arr instanceof Uint32Array) return gl.UNSIGNED_INT
+    if (arr instanceof Int8Array) return gl.BYTE
+    if (arr instanceof Uint8Array) return gl.UNSIGNED_BYTE
+    if (arr instanceof Int16Array) return gl.SHORT
+    if (arr instanceof Uint16Array) return gl.UNSIGNED_SHORT
+    throw new Error(`Unsupported typed array: ${typeof arr}`)
+}

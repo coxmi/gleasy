@@ -1,0 +1,16 @@
+{
+  "name": "webgl2",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "dev": "node build.js --watch"
+  },
+  "dependencies": {
+    "esbuild": "^0.27.2"
+  },
+  "devDependencies": {
+    "@types/node": "^25.3.0",
+    "glob": "^13.0.6"
+  }
+}
