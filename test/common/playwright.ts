@@ -162,13 +162,8 @@ export async function compareWithScreenshot(
     }
     await page.close()
 
-    // temporarily render the output, because otherwise the diff doesn't work the same
-    const tmpPath = diffPath + '-tmp.png'
-    const rendered = await writePng(png, tmpPath)
-    const renderedPng = await pngFromFile(tmpPath)
     const screenshotPng = await pngFromFile(screenshotPath)
-    const compare = comparePng(renderedPng, screenshotPng)
-    await fs.promises.unlink(tmpPath)
+    const compare = comparePng(png, screenshotPng)
     if (compare.pixels > 0) {
         await writePng(compare.diff, diffPath)
         throw new Error(`Pixels differ: ${compare.pixels} (diff saved to ${diffPath})`)
