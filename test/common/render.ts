@@ -19,6 +19,6 @@ export function renderResult(gl: WebGL2RenderingContext) {
 }
 
 
-export function saveRenderResult(gl: WebGL2RenderingContext) {    
+export function saveRenderResult(gl: WebGL2RenderingContext) {
     window.__rendered = renderResult(gl)
 }

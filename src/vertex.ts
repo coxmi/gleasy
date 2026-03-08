@@ -168,18 +168,15 @@ function parseLayouts(input: LayoutArgs) {
     for (const { buffer, stride } of layouts) {
         const elements = buffer.count / stride
         if (!vertices) vertices = elements
-        {
-            // validate stride length as a factor of the overall buffer length
-            const name = `${buffer.constructor.name} – ${buffer.buffer.constructor.name}(elements:${buffer.count})`
-            if (buffer.count % stride !== 0) {
-                const message = 
-                    `${name}: attribute stride (${stride}) is not a factor of buffer size (${buffer.count}).`
-                console.warn(message, buffer)
-            }
-            // validate vertex length is equal for all sibling buffers
-            if (elements !== vertices) {
-                console.warn(`${name}: Vertex count (${vertices}) does not match other buffers (${elements})`)
-            }
+        // validate stride length as a factor of the overall buffer length
+        const name = `${buffer.constructor.name} – ${buffer.buffer.constructor.name}(elements:${buffer.count})`
+        if (buffer.count % stride !== 0) {
+            const message = `${name}: attribute stride (${stride}) is not a factor of buffer size (${buffer.count}).`
+            console.warn(message, buffer)
+        }
+        // validate vertex length is equal for all sibling buffers
+        if (elements !== vertices) {
+            console.warn(`${name}: Vertex count (${vertices}) does not match other buffers (${elements})`)
         }
     }
     return layouts

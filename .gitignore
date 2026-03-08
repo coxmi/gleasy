@@ -19,5 +19,6 @@ report.*.json
 
 # Ignore output or test coverage
 
+test/diffs
 dist
 coverage

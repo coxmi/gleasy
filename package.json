@@ -6,7 +6,7 @@
     "build": "node build.js",
     "dev": "node build.js --watch",
     "screenshots": "node --require ts-node/register test/common/playwright.ts --update-screenshots",
-    "test": "node --require ts-node/register --test '**/*.test.ts'"
+    "test": "tsc --noEmit && node --require ts-node/register --test '**/*.test.ts'"
   },
   "dependencies": {
     "esbuild": "^0.27.2"

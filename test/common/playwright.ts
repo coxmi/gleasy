@@ -73,9 +73,10 @@ export async function renderScene({ page, url, timeout = 1000 }: RenderSceneArgs
 
 // PNG helpers
 
-async function writePng(png: PNG, path: string) {
+async function writePng(png: PNG, filepath: string) {
+    await fs.promises.mkdir(path.dirname(filepath), { recursive: true })
     return await new Promise<void>((resolve, reject) => {
-        png.pack().pipe(fs.createWriteStream(path))
+        png.pack().pipe(fs.createWriteStream(filepath))
             .on("finish", resolve)
             .on("error", reject)
     })
@@ -87,12 +88,12 @@ type ComparePNGOptions = {
 
 function comparePng(a: PNG, b: PNG, { threshold = 0 }: ComparePNGOptions = {}) {
     if (a.width !== b.width || a.height !== b.height) {
-        throw new Error("Dimension mismatch between screenshot and reference")
+        throw new Error(`Dimension mismatch between screenshot and reference (${a.width}x${a.height}, ${b.width}x${b.height})`)
     }
     const diff = new PNG({ width: a.width, height: a.height })
     const pixels = pixelmatch(a.data, b.data, diff.data, a.width, a.height, { 
         threshold,
-        includeAA: true,
+        // includeAA: false,
         diffMask: true 
     })
     return { diff, pixels }
@@ -110,25 +111,20 @@ async function pngFromFile(file: string) {
 
 export async function updateScreenshots() {
     const browser = await createBrowser()
-    const exampleDirs = glob.sync('examples/*')
+    const htmlFiles = glob.sync('examples/*/*.html')
 
     await fs.promises.rm('test/screenshots', { recursive: true, force: true })
     await fs.promises.mkdir('test/screenshots')
 
-    const processes = exampleDirs.map(async dir => {
-        const dirname = path.basename(dir)
-        const html = path.join(process.cwd(), dir, 'index.html')
-        if (!fs.existsSync(html)) {
-            throw new Error(`No file exists at: ${path.join(dir, 'index.html')}`)
-        }
-
-        const screenshot = path.join(process.cwd(), 'test/screenshots/', `${dirname}.png`)
+    const processes = htmlFiles.map(async htmlFile => {
+        const example  = getExampleInfo(htmlFile)
+        const screenshot = path.join(process.cwd(), 'test/screenshots/', `${example.screenshotBase}.png`)
         const page = await newPage(browser)
         try {
-            const png = await renderScene({ page, url: pathToFileURL(html).href })
+            const png = await renderScene({ page, url: pathToFileURL(example.path).href })
             await writePng(png, screenshot)
         } catch(e) {
-            console.error('failed:', html)
+            console.error('failed:', htmlFile)
             // stacks are just from playwright, so we can 
             // just ignore them for now
             e.stack = ''
@@ -146,7 +142,8 @@ export async function compareWithScreenshot(
     screenshotPath: string, 
     diffPath: string
 ) {
-    const name = path.relative(process.cwd(), htmlPath)
+    const name = path.relative(process.cwd(), htmlPath).replace(/\/index\.html$/, '')
+    const diffName = path.relative(process.cwd(), diffPath)
     if (!fs.existsSync(htmlPath)) throw new Error(`No file exists at: ${name}`)
     if (!fs.existsSync(screenshotPath)) throw new Error(`No screenshot for file: ${name}`)
 
@@ -157,39 +154,66 @@ export async function compareWithScreenshot(
         png = await renderScene({ page, url: pathToFileURL(htmlPath).href })
     } catch(e) {
         await page.close()
-        // stacks are just from playwright, so just rethrow for now
-        throw new Error(`Render scene failed: ${name}`)
+        // stacks are just from playwright, so just throw a simple message instead
+        throw new Error(`${name} - failed to render scene`)
     }
     await page.close()
 
-    const screenshotPng = await pngFromFile(screenshotPath)
-    const compare = comparePng(png, screenshotPng)
+    // compare output
+    let compare: ReturnType<typeof comparePng>
+    try {
+        const screenshotPng = await pngFromFile(screenshotPath)
+        compare = comparePng(png, screenshotPng)
+    } catch(e) {
+        e.message = `${name} - ${e.message}`
+        throw e
+    }
+
     if (compare.pixels > 0) {
         await writePng(compare.diff, diffPath)
-        throw new Error(`Pixels differ: ${compare.pixels} (diff saved to ${diffPath})`)
+        const format = num => Intl.NumberFormat('en', { notation: 'compact', maximumFractionDigits: 1 }).format(num)
+        throw new Error(`${name}: ${format(compare.pixels)} pixels differ, saved diff at: ${diffName}`)
     }
     return true
 }
 
 
+function getExampleInfo(htmlFile) {
+    let fileNameBase = path.basename(htmlFile).replace(/\.html$/, '')
+    if (fileNameBase === 'index') fileNameBase = ''
+    const folderName = path.dirname(htmlFile)
+    const screenshotBase = path.join([folderName, fileNameBase].filter(Boolean).join('-'))
+    const htmlPath = path.join(process.cwd(), htmlFile)
+    if (!fs.existsSync(htmlPath)) {
+        throw new Error(`No file exists at: ${path.relative(process.cwd(), htmlPath)}`)
+    }
+    return {
+        fileNameBase, 
+        folderName, 
+        path: htmlPath, 
+        screenshotBase, 
+    }
+}
+
+
 export async function compareExamplesWithScreenshots() {
     const browser = await createBrowser()
-    const exampleDirs = glob.sync('examples/*')
+    const exampleHtmlFiles = glob.sync('examples/*/*.html')
     await fs.promises.rm('test/diffs', { recursive: true, force: true })
     await fs.promises.mkdir('test/diffs')
-    const processes = exampleDirs.map(async dir => {
-        const htmlFile = path.join(process.cwd(), dir, 'index.html')
-        const dirname = path.basename(path.dirname(htmlFile))
-        const screenshotPath = path.join(process.cwd(), 'test/screenshots/', `${dirname}.png`)
-        const diffPath = path.join(process.cwd(), 'test/diffs/', `${dirname}.png`)
+
+    const processes = exampleHtmlFiles.map(async htmlFile => {
+        const example = getExampleInfo(htmlFile)
+        const screenshotPath = path.join(process.cwd(), 'test/screenshots/', `${example.screenshotBase}.png`)
+        const diffPath = path.join(process.cwd(), 'test/diffs/', `${example.screenshotBase}.png`)
         return await compareWithScreenshot(browser, htmlFile, screenshotPath, diffPath)
     })
+
     try {
-        await Promise.all(processes)
+        await Promise.all(processes)    
     } catch(e) {
-        console.log(e)
         await browser.close()
-        return false
+        throw e
     }
     await browser.close()
     return true
