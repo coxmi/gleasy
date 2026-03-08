@@ -1,4 +1,5 @@
 import { createUniforms } from './uniforms.ts'
+import { prettyConsole } from './debug.ts'
 import type { Uniforms, UniformArgs } from './uniforms.ts'
 import type { Expand } from './util.ts'
 
@@ -44,8 +45,8 @@ export class Shader<U extends UniformArgs = {}> {
 
 
 function createProgram(gl: WebGL2RenderingContext, vertexShader: string, fragmentShader: string) {
-    const vs = compileShader(gl, gl.VERTEX_SHADER, vertexShader.trimStart())
-    const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragmentShader.trimStart())
+    const vs = compileShader(gl, gl.VERTEX_SHADER, vertexShader)
+    const fs = compileShader(gl, gl.FRAGMENT_SHADER, fragmentShader)
     const program = gl.createProgram()
     gl.attachShader(program, vs)
     gl.attachShader(program, fs)
@@ -60,11 +61,17 @@ function createProgram(gl: WebGL2RenderingContext, vertexShader: string, fragmen
     return program
 }
 
-function compileShader(gl: WebGLRenderingContext, type: number, source: string) {
+function compileShader(gl: WebGL2RenderingContext, type: number, source: string) {
     const shader = gl.createShader(type)!
-    gl.shaderSource(shader, source)
+    gl.shaderSource(shader, source.trimStart())
     gl.compileShader(shader)
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) 
-        throw new Error(gl.getShaderInfoLog(shader) as string)
+
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+        const log = (gl.getShaderInfoLog(shader) || 'Unknown error')
+        const [message, ...styles] = prettyConsole(log, source, true)
+        console.error('shader compilation failed:\n\n' + message, ...styles)        
+        throw new Error('shader compilation failed:\n' + log)
+    }
+
     return shader
 }
