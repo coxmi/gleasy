@@ -3,7 +3,9 @@
 
 export function prettyConsole(log: string, source: string, isTrimmed: boolean) {
     log = log.split('\n').map(x => x.trim()).filter(Boolean).join('\n')
-    const trimmedSpaces = isTrimmed && (source.match(/^\s*/)?.[0] || '').split('\n').at(-1) || ''
+    const trim = (string: string) => (string.match(/^\s*/)?.[0] || '').split('\n').at(-1) || ''
+    const trimmedSpaces = isTrimmed ? trim(source) : source
+    
     const errors = log.split('\n').filter(Boolean).map(err => {
         const match = err.match(/ERROR:\s*(\d+):(\d+): '([^']+)' : (.*)/)
         const line = match?.[2] ? parseInt(match[2]) - 1 : -1
@@ -30,8 +32,11 @@ export function prettyConsole(log: string, source: string, isTrimmed: boolean) {
         if (ellip && lineInfo(i - 1).ellip) return false
         if (ellip) code = '...';
         styles.push(style + 'color:#b3b3b3;')
+        
         if (error?.line === i) {
-            const errorPos = code.indexOf(error.term)
+            let errorPos = code.indexOf(error.term)
+            if (errorPos < 0 && error.term === 'constructor') errorPos = code.indexOf('(')
+            if (errorPos < 0) errorPos = trim(code).length
             styles.push(style + 'color:#C72B4F; font-weight:500;')
             styles.push(style + 'font-style:italic; color:#F31D4F; font-weight:bold;')
             return [`%c${num}  %c${code}%c\n     ${' '.repeat(errorPos)}^${error.message}`]

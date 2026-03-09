@@ -13,7 +13,8 @@ import pixelmatch from 'pixelmatch'
 if (import.meta.url === `file://${process.argv[1]}`) {
     const arg = process.argv[2]
     if (arg === '--update-screenshots') {
-        updateScreenshots()
+        const whitelist = process.argv.length > 3 && process.argv.slice(3) || undefined
+        updateScreenshots(whitelist)
     }
 }
 
@@ -32,6 +33,7 @@ export async function createBrowser(debug = false) {
 
 export async function newPage(browser: Browser, debug = false) {
     const page = await browser.newPage()
+    page.on("pageerror", err => console.log(`[BROWSER ${err.name}] ${err.message}`))
     if (debug) {
         page.on("console", msg => console.log(`[BROWSER ${msg.type()}] ${msg.text()}`))
         page.on("requestfinished", req => console.log("[BROWSER REQUEST FINISHED]", req.url()))
@@ -109,12 +111,18 @@ async function pngFromFile(file: string) {
 
 // render screenshots to /test/screenshots/ folder
 
-export async function updateScreenshots() {
+export async function updateScreenshots(whitelist?: string[]) {
     const browser = await createBrowser()
-    const htmlFiles = glob.sync('examples/*/*.html')
 
-    await fs.promises.rm('test/screenshots', { recursive: true, force: true })
-    await fs.promises.mkdir('test/screenshots')
+    const htmlFiles = glob.sync('examples/*/*.html').filter(path => {
+        if (!whitelist?.length) return true
+        return whitelist.some(w => path.includes(w))
+    })
+
+    if (!whitelist) {
+        await fs.promises.rm('test/screenshots', { recursive: true, force: true })
+        await fs.promises.mkdir('test/screenshots')
+    }
 
     const processes = htmlFiles.map(async htmlFile => {
         const example  = getExampleInfo(htmlFile)
@@ -196,11 +204,17 @@ function getExampleInfo(htmlFile) {
 }
 
 
-export async function compareExamplesWithScreenshots() {
+export async function compareExamplesWithScreenshots(whitelist?: string[]) {
     const browser = await createBrowser()
-    const exampleHtmlFiles = glob.sync('examples/*/*.html')
-    await fs.promises.rm('test/diffs', { recursive: true, force: true })
-    await fs.promises.mkdir('test/diffs')
+    const exampleHtmlFiles = glob.sync('examples/*/*.html').filter(path => {
+        if (!whitelist?.length) return true
+        return whitelist.some(w => path.includes(w))
+    })
+
+    if (!whitelist) {
+        await fs.promises.rm('test/diffs', { recursive: true, force: true })
+        await fs.promises.mkdir('test/diffs')
+    }
 
     const processes = exampleHtmlFiles.map(async htmlFile => {
         const example = getExampleInfo(htmlFile)
