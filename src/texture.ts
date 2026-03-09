@@ -1,11 +1,11 @@
 
 type TextureOptions = {
-    flip?: boolean
-    repeat?: boolean
-    mirror?: boolean
-    mipmaps?: boolean
-    interpolateMips?: boolean
-    interpolate?: boolean
+    flip?: boolean // false
+    repeat?: boolean // false
+    repeatMirror?: boolean // false
+    mipmaps?: boolean // false
+    interpolate?: boolean // true
+    interpolateMips?: boolean // true
 }
 
 type TextureWrap =
@@ -24,10 +24,10 @@ type TextureFilter =
 function textureWrap(gl: WebGL2RenderingContext, options: TextureOptions = {}): TextureWrap {
     const { 
         repeat = false, 
-        mirror = false 
+        repeatMirror = false 
     } = options
     if (!repeat) return gl.CLAMP_TO_EDGE
-    return mirror ? gl.MIRRORED_REPEAT : gl.REPEAT
+    return repeatMirror ? gl.MIRRORED_REPEAT : gl.REPEAT
 }
 
 function textureInterpolate(gl: WebGL2RenderingContext, options: TextureOptions = {}): TextureFilter {

@@ -19,7 +19,7 @@ canvas {
     left:calc(50% - 400px);
 }
 
-.texture-image-example {
+.texture {
     position:absolute;
     bottom:1em;
     right:1em;
