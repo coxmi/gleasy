@@ -167,7 +167,7 @@ function uniforms() {
     // use type hints for uniforms, and set initial values
     type Uniforms = { uMovePos: 'vec3' }
     const shader = new Shader<Uniforms>(gl, vertexSrc, fragmentSrc, {
-        uMovePos: [0.2, 0.2, 0.2]
+        uMovePos: [0.5, 0.5, 0.5]
     })
 
     const buffer = new VertexBuffer(gl, [ 
