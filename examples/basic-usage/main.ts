@@ -153,9 +153,8 @@ function vertexIndices() {
 function uniforms() {
     const vertexSrc = `
         #version 300 es
-        // uniform added to move position
+        // uniform added to transform position attribute
         uniform vec3 uMovePos; 
-        in vec3 APOS;
         in vec3 aPosition;
         in vec3 aColor;
         out vec3 vColor;
@@ -165,14 +164,13 @@ function uniforms() {
             vColor = aColor;
         }
     `
-
     // use type hints for uniforms, and set initial values
     type Uniforms = { uMovePos: 'vec3' }
     const shader = new Shader<Uniforms>(gl, vertexSrc, fragmentSrc, {
-        uMovePos: [0, 0, 0]
+        uMovePos: [0.2, 0.2, 0.2]
     })
 
-    const buffer = new VertexBuffer(gl, [
+    const buffer = new VertexBuffer(gl, [ 
          0.0,  0.5, 0.0,  1.0, 0.0, 0.0, 
         -0.5, -0.5, 0.0,  0.0, 1.0, 0.0, 
          0.5, -0.5, 0.0,  0.0, 0.0, 1.0 
@@ -185,22 +183,118 @@ function uniforms() {
         }
     })
     shader.use()
-    // update uniforms before each draw call
-    shader.uniforms.uMovePos = [0.2, 0.2, 0.2]
+    // update uniforms before each draw call with:
+    // shader.uniforms.uMovePos = [0.4, 0.4, 0.4]
     vao.bind()
     vao.draw()
 }
 
+function uniformArrays() {
+    const vertexSrc = `
+        #version 300 es
+        uniform vec3 uColors[4]; // array of 4 colors
+        in vec2 aPosition;
+        out vec3 vColor;
+        void main() {
+            gl_Position = vec4(aPosition, 1.0, 1.0);
+            // pick a color based on vertex index
+            int idx = gl_VertexID % 4; 
+            vColor = uColors[idx];
+        }
+    `
+    type Uniforms = { uColors: 'vec3' }
+    const shader = new Shader<Uniforms>(gl, vertexSrc, fragmentSrc, {
+        uColors: [
+            // red, green, blue, yellow
+            1.0, 0.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 0.0, 1.0,
+            1.0, 1.0, 0.0 
+        ]
+    })
+    // 4 vertices for a quad, using gl.TRIANGLE_STRIP
+    const buffer = new VertexBuffer(gl, [
+        -0.5, -0.5,
+         0.5, -0.5,
+        -0.5,  0.5,
+         0.5,  0.5
+    ])
 
-// @ts-ignore expose to html
+    const vao = new VAO(gl, shader, {
+        buffer,
+        layout: {
+            aPosition: { type: 'vec2' },
+        }
+    })
+
+    shader.use()
+    vao.bind()
+    vao.draw(gl.TRIANGLE_STRIP)
+}
+
+function uniformMatrices() {
+
+    function rotate(radians: number) {
+        var c = Math.cos(radians)
+        var s = Math.sin(radians)
+        return [
+          c, -s, 0,
+          s, c, 0,
+          0, 0, 1,
+        ];
+    }    
+
+    const vertexSrc = `
+        #version 300 es
+        uniform mat3 uTransform; // matrix transform
+        in vec3 aPosition;
+        in vec3 aColor;
+        out vec3 vColor;
+        void main() {
+            gl_Position = vec4(aPosition * uTransform, 1.0);
+            vColor = aColor;
+        }
+    `
+    type Uniforms = { uTransform: 'mat3' }
+    const shader = new Shader<Uniforms>(gl, vertexSrc, fragmentSrc, {
+        uTransform: rotate(10)
+    })
+
+    // 4 vertices for a quad using gl.TRIANGLE_STRIP, with colors
+    const buffer = new VertexBuffer(gl, [
+        -0.5, -0.5, 0,  1.0, 0.0, 0.0,
+         0.5, -0.5, 0,  0.0, 1.0, 0.0,
+        -0.5,  0.5, 0,  0.0, 0.0, 1.0,
+         0.5,  0.5, 0,  0.0, 0.0, 0.0,
+    ])
+
+    const vao = new VAO(gl, shader, {
+        buffer,
+        layout: {
+            aPosition: { type: 'vec3' },
+            aColor: { type: 'vec3' },
+        }
+    })
+
+    shader.use()
+    vao.bind()
+    vao.draw(gl.TRIANGLE_STRIP)
+}
+
+
+// @ts-ignore: expose functions to html files
 window.saveRenderResult = () => saveRenderResult(gl)
-// @ts-ignore expose to html
+// @ts-ignore
 window.interleavedAttributes = interleavedAttributes
-// @ts-ignore expose to html
+// @ts-ignore
 window.multipleBuffers = multipleBuffers
-// @ts-ignore expose to html
+// @ts-ignore
 window.definedAttributeLocations = definedAttributeLocations
-// @ts-ignore expose to html
+// @ts-ignore
 window.vertexIndices = vertexIndices
-// @ts-ignore expose to html
+// @ts-ignore
 window.uniforms = uniforms
+// @ts-ignore
+window.uniformArrays = uniformArrays
+// @ts-ignore
+window.uniformMatrices = uniformMatrices

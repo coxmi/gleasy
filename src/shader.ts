@@ -26,7 +26,9 @@ export class Shader<U extends UniformArgs = {}> {
         uniformValues?: Uniforms<U>
     ) {
         this.program = createProgram(gl, vertexShader, fragmentShader)
+        gl.useProgram(this.program)
         this.uniforms = createUniforms<U>(gl, this.program, uniformValues) 
+        gl.useProgram(null)
         this.gl = gl
     }
     use() {

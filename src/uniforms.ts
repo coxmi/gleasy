@@ -100,15 +100,19 @@ export function createUniforms<T extends UniformArgs>(
             console.warn('Unsupported uniform type:', type, name)
             continue
         }
-        uniformInfo[name] = { loc, type: type }
-        if (initial && name in initial) {
-            values[name] = initial[name as keyof typeof initial]
+        // normalize array names for setters
+        const setterName = name.endsWith('[0]') ? name.slice(0, -3) : name
+        uniformInfo[setterName] = { loc, type: type }
+        if (initial && setterName in initial) {
+            values[setterName] = initial[setterName as keyof typeof initial]
         }
     }
 
     if (initial) {
         for (const key in initial) {
             if (!(key in uniformInfo)) console.warn(`Uniform '${key}' not used in shader`)
+            const uniform = uniformInfo[key]
+            if (uniform) setters[uniform.type](gl, uniform.loc, initial[key])
         }
     }
 
