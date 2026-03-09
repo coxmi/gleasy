@@ -36,6 +36,7 @@ const fragmentSrc = `
 function interleavedAttributes() {
     const shader = new Shader(gl, vertexSrc, fragmentSrc)    
     const buffer = new VertexBuffer(gl, new Float32Array([
+         // x,y,z / r,g,b
          0.0,  0.5, 0.0,  1.0, 0.0, 0.0, 
         -0.5, -0.5, 0.0,  0.0, 1.0, 0.0, 
          0.5, -0.5, 0.0,  0.0, 0.0, 1.0 
@@ -54,7 +55,6 @@ function interleavedAttributes() {
 
 
 function multipleBuffers() {
-
     const shader = new Shader(gl, vertexSrc, fragmentSrc)
     const vertex = new VertexBuffer(gl, new Float32Array([
          0.0,  0.5, 0.0,  
@@ -66,7 +66,6 @@ function multipleBuffers() {
         0.0, 1.0, 0.0, 
         0.0, 0.0, 1.0 
     ]))
-
     const vao = new VAO(gl, shader, {
         layout: {
             aPosition: { type: 'vec3', buffer: vertex },
@@ -90,24 +89,25 @@ function definedAttributeLocations() {
             vColor = aColor;
         }
     `
-
     const shader = new Shader(gl, vertexSrcWithLocationSpecifiers, fragmentSrc)
-    const buffer = new VertexBuffer(gl, new Float32Array([
+
+    const buffer = new VertexBuffer(gl, [
          0.0,  0.5, 0.0,  1.0, 0.0, 0.0, 
         -0.5, -0.5, 0.0,  0.0, 1.0, 0.0, 
          0.5, -0.5, 0.0,  0.0, 0.0, 1.0 
-    ]))
+    ]);
 
-    const vao = new VAO(gl, {
-        buffer,
-        layout: {
-            myPositionName: { type: 'vec3', location: 0 },
-            myColorName: { type: 'vec3', location: 1 },
-        }
-    })
+    // when buffer.bind() is called, the described attribute pointers are bound for the shader
+    buffer.layout = [
+        { type: 'vec3', location: 0 },
+        { type: 'vec3', location: 1 },
+    ]
+
     shader.use()
-    vao.bind()
-    vao.draw()
+    // call buffer.bind() and buffer.draw() directly without a VAO
+    // (this has some overhead over using a VAO, so use VAOs where you can)
+    buffer.bind()
+    buffer.draw()
 }
 
 
@@ -119,11 +119,15 @@ function vertexIndices() {
          0.5, -0.5, 0.0,  0.0, 0.0, 1.0 
     ]))
 
-    // use Uint-typed arrays
-    const index = new VertexIndex(gl, new Uint16Array([
-        0, 1, 2
-    ]))
+    // use unsigned int TypedArrays for indices:
+    // (e.g. Uint8Array, Uint16Array, Uint32Array, Uint8ClampedArray)
+    const index = new VertexIndex(gl, new Uint8Array([0, 1, 2]))
+    const index2 = new VertexIndex(gl, new Uint8Array([2, 1, 0]))
+
     const vao = new VAO(gl, shader, {
+        // the first index is bound in the 
+        // vertex array object
+        index, 
         buffer,
         layout: {
             aPosition: { type: 'vec3' },
@@ -131,10 +135,16 @@ function vertexIndices() {
         }
     })
     shader.use()
+    // no need to bind/draw the first index, as 
+    // it's bound implicitly within the VAO
     vao.bind()
-    // bind and draw the index
-    index.bind()
-    index.draw()
+    vao.draw()
+
+    // but if you have multiple indexes, 
+    // these can be bound/drawn explicitly
+    vao.bind()
+    index2.bind()
+    index2.draw()
 }
 
 
@@ -159,11 +169,12 @@ function uniforms() {
     const shader = new Shader<Uniforms>(gl, vertexSrc, fragmentSrc, {
         uMovePos: [0, 0, 0]
     })
-    const buffer = new VertexBuffer(gl, new Float32Array([
+
+    const buffer = new VertexBuffer(gl, [
          0.0,  0.5, 0.0,  1.0, 0.0, 0.0, 
         -0.5, -0.5, 0.0,  0.0, 1.0, 0.0, 
          0.5, -0.5, 0.0,  0.0, 0.0, 1.0 
-    ]))
+    ])
     const vao = new VAO(gl, shader, {
         buffer,
         layout: {
@@ -172,11 +183,9 @@ function uniforms() {
         }
     })
     shader.use()
-    vao.bind()
-
     // update uniforms before each draw call
     shader.uniforms.uMovePos = [0.2, 0.2, 0.2]
-
+    vao.bind()
     vao.draw()
 }
 
