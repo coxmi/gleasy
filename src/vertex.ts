@@ -47,14 +47,18 @@ export class VertexBuffer {
         return glTypeFromTypedArray(this.gl, this.vertices)
     }
 
-    set layout(layout: VertexBufferLayout) {
+    setLayout(layout: VertexBufferLayout) {
         this.layouts = parseLayouts({ buffer: this, layout })
+    }
+
+    bindLayout() {
+        if (!this.layouts) throw new Error('No layout set for VertexBuffer')
+        bindAttributes(this.gl, this.layouts, /* no shader specified */ undefined)
     }
 
     bind() {
         const gl = this.gl
         gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer)
-        if (this.layouts) bindAttributes(this.gl, this.layouts, /* no shader specified */ undefined)
     }
 
     unbind() {

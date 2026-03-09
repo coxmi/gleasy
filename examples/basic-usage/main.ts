@@ -97,16 +97,18 @@ function definedAttributeLocations() {
          0.5, -0.5, 0.0,  0.0, 0.0, 1.0 
     ]);
 
-    // when buffer.bind() is called, the described attribute pointers are bound for the shader
-    buffer.layout = [
+    // when buffer.bind() is called, the described  
+    // attribute pointers are bound for the shader
+    buffer.setLayout([
         { type: 'vec3', location: 0 },
         { type: 'vec3', location: 1 },
-    ]
+    ])
 
     shader.use()
-    // call buffer.bind() and buffer.draw() directly without a VAO
-    // (this has some overhead over using a VAO, so use VAOs where you can)
+    // to call buffer.draw() directly without a VAO, bind the layout, then draw.
+    // binding the layout has some overhead, so use VAOs where you can
     buffer.bind()
+    buffer.bindLayout()
     buffer.draw()
 }
 
