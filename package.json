@@ -1,16 +1,16 @@
 {
-  "name": "glh",
+  "name": "gleasy",
   "version": "0.0.1",
   "description": "WebGL2 helper library",
   "author": "Michael Cox",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/coxmi/glh.git"
+    "url": "git+https://github.com/coxmi/gleasy.git"
   },
   "bugs": {
-    "url": "https://github.com/coxmi/glh/issues"
+    "url": "https://github.com/coxmi/gleasy/issues"
   },
-  "homepage": "https://github.com/coxmi/glh#readme",
+  "homepage": "https://github.com/coxmi/gleasy#readme",
   "keywords": [
     "webgl",
     "webgl2",

@@ -1,6 +1,6 @@
-# glh
+# gleasy
 
-A lightweight (3.9kb) wrapper over webgl2, with no dependenices.
+A lightweight (4.0kb) wrapper over webgl2, with no dependenices.
 
 You'll need to know WebGL concepts, but won't have to think about binding attribute pointers and uniforms. The main primitives are designed to be as flexible as possible, while abstracting away a lot of the boilerplate.
 
@@ -10,7 +10,7 @@ You'll need to know WebGL concepts, but won't have to think about binding attrib
 
 Create a shader with automatic uniform setters:
 
-In your shader:
+In your vertex shader:
 
 ```
 #version 300 es
@@ -24,8 +24,9 @@ void main() {
 In your program:
 
 ```ts
-import { Shader } from 'glh'
+import { Shader } from 'gleasy'
 
+// describe uniforms to get type hints
 type Uniforms = { 
    uTransformMatrix: 'mat3',
    uPos: 'vec3'
@@ -45,7 +46,7 @@ shader.use()
 
 ```
 
-#### Uniforms
+#### Uniform types
 
 All gl2 uniform types are supported: <br>
 `float` `vec2` `vec3` `vec4` `int` `ivec2` `ivec3` `ivec4` `uint` `uvec2` `uvec3` `uvec4` `bool` `bvec2` `bvec3` `bvec4` `mat2` `mat3` `mat4` `mat2x3` `mat2x4` `mat3x2` `mat3x4` `mat4x2` `mat4x3` `sampler2D` `samplerCube` 
@@ -60,27 +61,21 @@ uniform vec3 uColor;
 uniform mat3 uMatrix;
 uniform sampler2D uTex;
 uniform samplerCube uCubeMap;
-…
+...
 ```
 
+Types:
+
 ```ts
-const shader = new Shader<Uniforms>(gl, vertexSrc, fragmentSrc, {
-   uTime: 12345,
-   uPos: new Float32Array([0.5, 0.5]), // typed arrays
-   uColor: [255, 0, 0], // or standard arrays
-   uMatrix: [
-      // 3x3 identity
-      1, 0, 0,
-      0, 1, 0,
-      0, 0, 1,
-  ],
-   uTex: 0, // texture location 0
-   uCubeMap: 1 // texture location 1
-})
-
-// uniforms have type completion:
-shader.uniform.uPos = // type: Float32List | [number, number, number]
-
+// refer to glsl types by name
+type Uniforms { 
+   uTime: 'float'
+   uPos: 'vec2'
+   uColor: 'vec3' 
+   uMatrix: 'mat3'
+   uTex: 'sampler2D'
+   uCubeMap: 'samplerCube' 
+}
 ```
 
 ### `VertexBuffer`
@@ -88,7 +83,7 @@ shader.uniform.uPos = // type: Float32List | [number, number, number]
 Vertex data can be interleaved, or use multiple buffers as long as they have the same number of vertices. You can pass a TypedArray directly, or it will default to a `Float32Array` when called with a standard array type:
 
 ```ts
-import { VertexBuffer } from 'glh'
+import { VertexBuffer } from 'gleasy'
 
 // interleaved
 const vertices = new VertexBuffer(gl, new Float32Array([
@@ -111,44 +106,12 @@ const color = new VertexBuffers(gl, [
 ])
 ```
 
-### Vertex attribute layouts
-
-Attribute layouts can be described directly on the VertexBuffer and used in draw calls.
-
-In your program:
-
-```ts
-const vertices = new VertexBuffer(gl, [...data])
-
-// describe the vertex attribute layout
-vertices.setLayout([
-   { type: 'vec3', location: 0 },
-   { type: 'vec3', location: 1 },
-])
-
-// create and use a shader
-shader.use()
-
-// draw directly from attribute locations
-vertices.bind()
-vertices.bindLayout()
-vertices.draw()
-
-```
-
-In your shader:
-
-```glsl
-layout(location=0) in vec3 aPosition;
-layout(location=1) in vec3 aColor;
-```
-
 ### `VAO` / Vertex array objects
 
 Get attribute names/locations from the shader program:
 
 ```ts
-import { Shader, VAO } from 'glh'
+import { Shader, VAO } from 'gleasy'
 const shader = new Shader([...data])
 
 // describe the vertex attribute layout
@@ -194,12 +157,44 @@ vao.draw()
 
 ```
 
+### Vertex attribute layouts
+
+Attribute layouts can be described directly on the VertexBuffer and used in draw calls.
+
+In your vertex shader:
+
+```
+layout(location=0) in vec3 aPosition;
+layout(location=1) in vec3 aColor;
+```
+
+In your program:
+
+```ts
+const vertices = new VertexBuffer(gl, [...data])
+
+// describe the vertex attribute layout
+vertices.setLayout([
+   { type: 'vec3', location: 0 },
+   { type: 'vec3', location: 1 },
+])
+
+// create and use a shader
+shader.use()
+
+// draw directly from attribute locations
+vertices.bind()
+vertices.bindLayout()
+vertices.draw()
+
+```
+
 ### `VertexIndex`
 
 Draw parts of your vertex buffers:
 
 ```ts
-import { VertexIndex, VertexBuffer } from 'glh'
+import { VertexIndex, VertexBuffer } from 'gleasy'
 
 // create a vertex buffer
 const vertices = new VertexBuffer(gl, [...data])
@@ -238,7 +233,7 @@ index.draw()
 Create a texture from an image:
 
 ```ts
-import { Texture } from 'glh'
+import { Texture } from 'gleasy'
 // create a texture from an image 
 // (make sure the image has already loaded)
 const texture = new Texture(gl, image, {
@@ -272,7 +267,7 @@ vao.draw()
 
 In fragment shader:
 
-```glsl
+```
 #version 300 es
 precision highp float;
 uniform sampler2D tex;
@@ -288,7 +283,7 @@ void main() {
 ### Multi-pass rendering using `FrameBuffer`
 
 ```ts
-import { Texture, FrameBuffer } from 'glh'
+import { Texture, FrameBuffer } from 'gleasy'
 // create a texture to use use as the framebuffer
 const texture = new Texture(gl)
 const frame = new FrameBuffer(gl, texture)
@@ -314,7 +309,7 @@ quad.draw()
 The GL viewport should match the canvas, set this with:
 
 ```ts
-import { setGLViewport } from 'glh'
+import { setGLViewport } from 'gleasy'
 const gl = canvas.getContext('webgl2')
 setGLViewport(gl, canvas)
 ```
