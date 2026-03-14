@@ -17,19 +17,7 @@ jobs:
         steps:
             # check out and build
             - uses: actions/checkout@v4
-            - name: build and run tests
-              run: |
-                npm ci
-                npm run ci
-
-            # upload diffs if the CI fails
-            - name: upload diffs
-              if: always()
-              uses: actions/upload-artifact@v4
-              with:
-                name: screenshot-diffs
-                path: test/diffs/**/*.png
-                if-no-files-found: ignore
+            - uses: ./.github/actions/build
 
             # publish to npm
             - name: publish to npm

@@ -1,0 +1,16 @@
+name: test
+
+on:
+    push:
+        branches:
+            - "**"
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+        container:
+            image: mcr.microsoft.com/playwright:v1.58.2-noble
+        steps:
+            # check out and build
+            - uses: actions/checkout@v4
+            - uses: ./.github/actions/build
