@@ -1,6 +1,7 @@
-import { TYPE_LENGTH, TYPE_COLUMNS, type AttributeType } from './attributes.ts'
+import { TYPE_INFO } from './attributes.ts'
 import { glTypeFromTypedArray } from './util.ts'
-import type { TypedArray, UintTypedArray, DrawMode } from './types.ts'
+import type { TypedArray, UintTypedArray, DrawMode, GLType } from './types.ts'
+import type { AttributeType } from './attributes.ts'
 import type { Shader } from './shader.ts'
 
 
@@ -194,15 +195,19 @@ function parseLayouts(input: LayoutArgs) {
         let index = buffers.get(buffer)
         if (index === undefined) buffers.set(buffer, index = buffers.size)
         const layout = layouts[index] ?? (layouts[index] = { buffer, stride: 0, layout: {} })
-        const length = TYPE_LENGTH[schema.type]
+        const info = TYPE_INFO[schema.type]
+        // TODO: may need compatibility debug message here that takes into consideration buffer's glType
+        // and compares it with the options for attribute types (e.g. using a Uint16Array with an int)
+        // if (!typeCompatible(buffer.glType, info.gl) {
+        //     console.warn(`Mismatched buffer and attribute types: buffer (${buffer.glType}) attribute:${name} (${info.gl})`)
+        // }
         layout.layout[name] = {
-            length,
-            // @ts-expect-error: any unset have 1 column
-            columns: TYPE_COLUMNS[schema.type] ?? 1,
+            length: info.row,
+            columns: info ? info.col : 1,
             offset: layout.stride,
-            location: schema.location
+            location: schema.location,
         }
-        layout.stride += length
+        layout.stride += info.row
     }
 
     let vertices = 0
@@ -223,6 +228,17 @@ function parseLayouts(input: LayoutArgs) {
     return layouts
 }
 
+function isIntOrUintType(gl: WebGL2RenderingContext, glEnum: GLType) {
+    return (
+        glEnum === gl.INT 
+        || glEnum === gl.UNSIGNED_INT 
+        || glEnum === gl.BYTE 
+        || glEnum == gl.UNSIGNED_BYTE
+        || glEnum == gl.SHORT
+        || glEnum == gl.UNSIGNED_SHORT
+    )
+}
+
 function bindAttributes(gl: WebGL2RenderingContext, parsedLayouts: ParsedLayout[], program?: WebGLProgram): void {
     for (const item of parsedLayouts) {
         const { stride, buffer, layout } = item
@@ -230,21 +246,28 @@ function bindAttributes(gl: WebGL2RenderingContext, parsedLayouts: ParsedLayout[
         for (const name in layout) {
             const { length, columns, offset, location } = layout[name]
             const attribLocation = location ?? (program ? gl.getAttribLocation(program, name) : -1)
-            if (attribLocation < 0) 
-                throw new Error(
+            if (attribLocation < 0) {
+                console.warn(
                     `No location found for ${name}, set the location explicitly` 
-                    + (program ? 'or pass in a shader' : '')
+                    + (program ? ' or pass in a shader' : '')
                 )
+                continue
+            }
             const rows = length / columns
             const bytesPerCol = rows * buffer.bytes
             for (let i = 0; i < columns; i++) {
                 gl.enableVertexAttribArray(attribLocation + i)
-                gl.vertexAttribPointer(
-                    attribLocation + i, rows, buffer.glType,
-                    false, // TODO: normalized option if required
-                    stride * buffer.bytes,
-                    (offset * buffer.bytes) + (i * bytesPerCol)
-                )
+                const str = stride * buffer.bytes
+                const off = (offset * buffer.bytes) + (i * bytesPerCol)
+                if (isIntOrUintType(gl, buffer.glType)) {
+                    gl.vertexAttribIPointer(attribLocation + i, rows, buffer.glType, str, off)
+                } else {
+                    gl.vertexAttribPointer(
+                        attribLocation + i, rows, buffer.glType, 
+                        false,  // TODO: work out normalization option
+                        str, off
+                    )
+                }
             }
         }
     }

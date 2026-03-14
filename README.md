@@ -84,7 +84,7 @@ type Uniforms {
 }
 
 const shader = new Shader<Uniforms>(gl, vertex, fragment, {
-   uLightColors // array[12]
+   uLightColors // number[12]
 })
 ```
 

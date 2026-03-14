@@ -1,18 +1,37 @@
 
-export type AttributeType = keyof typeof TYPE_LENGTH
+export type AttributeType = keyof typeof TYPE_INFO
 
-export const TYPE_LENGTH = { 
-    float: 1, vec2: 2, vec3: 3, vec4: 4,
-    int: 1, ivec2: 2, ivec3: 3, ivec4: 4,
-    uint: 1, uvec2: 2, uvec3: 3, uvec4: 4,
-    bool: 1, bvec2: 2, bvec3: 3, bvec4: 4,
-    mat2: 4, mat3: 9, mat4: 16, 
-    mat2x3: 6, mat3x2: 6, mat2x4: 8, 
-    mat4x2: 8, mat3x4: 12, mat4x3: 12
-} as const
 
-export const TYPE_COLUMNS = {
-    mat2: 2, mat3: 3, mat4: 4,
-    mat2x3: 2, mat3x2: 3, mat2x4: 2, 
-    mat4x2: 4, mat3x4: 3, mat4x3: 4
+// limit attribute types depending on use
+// e.g. no bool/bvec types in vertex attributes
+export type VertexAttributeType = Exclude<
+    AttributeType, 'bool' | 'bvec2' | 'bvec3' | 'bvec4'
+>
+
+export const TYPE_INFO = {
+    float: { row: 1, col: 1 },
+    vec2: { row: 2, col: 1 },
+    vec3: { row: 3, col: 1 },
+    vec4: { row: 4, col: 1 },
+    int: { row: 1, col: 1 },
+    ivec2: { row: 2, col: 1 },
+    ivec3: { row: 3, col: 1 },
+    ivec4: { row: 4, col: 1 },
+    uint: { row: 1, col: 1 },
+    uvec2: { row: 2, col: 1 },
+    uvec3: { row: 3, col: 1 },
+    uvec4: { row: 4, col: 1 },
+    bool: { row: 1, col: 1 },
+    bvec2: { row: 2, col: 1 },
+    bvec3: { row: 3, col: 1 },
+    bvec4: { row: 4, col: 1 },
+    mat2: { row: 2, col: 2 },
+    mat3: { row: 3, col: 3 },
+    mat4: { row: 4, col: 4 },
+    mat2x3: { row: 3, col: 2 },
+    mat3x2: { row: 2, col: 3 },
+    mat2x4: { row: 4, col: 2 },
+    mat4x2: { row: 2, col: 4 },
+    mat3x4: { row: 4, col: 3 },
+    mat4x3: { row: 3, col: 4 }
 } as const
