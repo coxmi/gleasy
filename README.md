@@ -344,3 +344,14 @@ setGLViewport(gl, canvas)
 ```
 
 
+### Roadmap
+
+* Uniform buffer objects and std140 layouts
+* Transform buffers for use in simulations
+* Instanced rendering
+* Shader includes
+* Some fun examples
+
+### Contributing
+
+Open to contributions and happy to review any PRs as long as they're from a human.
