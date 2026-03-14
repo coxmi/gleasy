@@ -344,7 +344,7 @@ setGLViewport(gl, canvas)
 ```
 
 
-### Roadmap
+## Roadmap
 
 * Uniform buffer objects and std140 layouts
 * Transform buffers for use in simulations
@@ -352,6 +352,6 @@ setGLViewport(gl, canvas)
 * Shader includes
 * Some fun examples
 
-### Contributing
+## Contributing
 
 Open to contributions and happy to review any PRs as long as they're from a human.
