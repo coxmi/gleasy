@@ -1,21 +1,9 @@
 import type { Expand } from "./util.ts"
+import type { UniformAttributeType } from "./attributes.ts"
+
 
 /**
- * Basic uniform types
- */
-export type UniformType =
-    | 'float' | 'vec2' | 'vec3' | 'vec4'
-    | 'int' | 'ivec2' | 'ivec3' | 'ivec4'
-    | 'uint' | 'uvec2' | 'uvec3' | 'uvec4'
-    | 'bool' | 'bvec2' | 'bvec3' | 'bvec4'
-    | 'mat2' | 'mat3' | 'mat4'
-    | 'mat2x3' | 'mat2x4'
-    | 'mat3x2' | 'mat3x4'
-    | 'mat4x2' | 'mat4x3'
-    | 'sampler2D' | 'samplerCube'
-
-/**
- * Allowed values in the uniform setters
+ * Allowed values in uniform setters
  */
 type UniformValueMap<C extends number> = {
     float: ScalarOrArray<number, C>
@@ -88,7 +76,7 @@ type RepeatTuple<
 
 // detect array length vec3[x], or fall back to single vec3
 type UniformValue<T extends string> =
-    ParseUniformType<T> extends UniformType
+    ParseUniformType<T> extends UniformAttributeType
         ? ParseArrayLength<T> extends never
             ? T extends `${string}[]`
                 ? number[]
@@ -96,17 +84,32 @@ type UniformValue<T extends string> =
             : UniformValueMap<ParseArrayLength<T>>[ParseUniformType<T> & keyof UniformValueMap<ParseArrayLength<T>>]
         : never
 
+// deal with struct types recursively
+type NestedStructs<T> =
+    T extends string ? UniformValue<T> : // basic GL type
+    T extends Array<infer U> ? NestedStructs<U>[] : // array of structs
+    T extends object ? { [K in keyof T]: NestedStructs<T[K]> } : // nested struct
+    never
+
 // allowed user input vec3 / vec3[] / vec3[4]
 export type UniformTypeWithSizes = 
-    | UniformType
-    | `${UniformType}[${number}]`
-    | `${UniformType}[]`
+    | UniformAttributeType
+    | `${UniformAttributeType}[${number}]`
+    | `${UniformAttributeType}[]`
 
-export type UniformArgs = Record<string, UniformTypeWithSizes>
 
-export type Uniforms<T extends UniformArgs> = {
-    [K in keyof T]: UniformValue<T[K]>
+export type UniformArgValue =
+    | UniformTypeWithSizes
+    | { [key: string]: UniformArgValue }
+    | UniformArgValue[]
+
+export type UniformArgs = Record<string, UniformArgValue>
+
+
+export type Uniforms<T extends Record<string, any>> = {
+    [K in keyof T]: NestedStructs<T[K]>
 }
+
 
 // create setters
 
@@ -147,6 +150,7 @@ const setters: Record<GLenum, (gl: WebGL2RenderingContext, loc: WebGLUniformLoca
  * Works with:
  *  - Arrays with a specific length: vec3[8]
  *  - Or an unspecified length: vec3[]
+ *  - Nested structs or struct arrays: { color: 'vec3' }[]
  * 
  */
 export function createUniforms<T extends UniformArgs>(
@@ -154,41 +158,59 @@ export function createUniforms<T extends UniformArgs>(
     program: WebGLProgram,
     initial?: Uniforms<T>
 ): Expand<Uniforms<T>> {
+
     const values: Record<string, any> = {}
     const uniformInfo: Record<string, { loc: WebGLUniformLocation, type: number }> = {}
-    const numUniforms = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS)
-    for (let i = 0; i < numUniforms; i++) {
+
+    const n = gl.getProgramParameter(program, gl.ACTIVE_UNIFORMS)
+    for (let i = 0; i < n; i++) {
         const { name, type } = gl.getActiveUniform(program, i)!
-        const loc = gl.getUniformLocation(program, name)
-        const setter = loc && setters[type]
-        if (!setter) {
-            console.warn('Unsupported uniform type:', type, name)
-            continue
-        }
+        const loc = gl.getUniformLocation(program, name)!
         // normalize array names for setters
-        const setterName = name.endsWith('[0]') ? name.slice(0, -3) : name
-        uniformInfo[setterName] = { loc, type: type }
-        if (initial && setterName in initial) {
-            values[setterName] = initial[setterName as keyof typeof initial]
+        const n = name.endsWith('[0]') ? name.slice(0, -3) : name
+        uniformInfo[n] = { loc, type }
+    }
+
+    function setUniform(path: string, value: any) {
+        const info = uniformInfo[path]
+        if (info) {
+            // leaf node, call the setter
+            const setter = setters[info.type]
+            if (!setter) return console.warn('Unsupported uniform type:', info.type, path)
+            setter(gl, info.loc, value)
+        } else if (Array.isArray(value)) {
+            // struct array
+            value.map((v, i) => setUniform(`${path}[${i}]`, v))
+        } else if (value && typeof value === 'object') {
+            // struct fields
+            for (const k in value) setUniform(path ? `${path}.${k}` : k, value[k])
+        } else {
+            console.warn(`Uniform '${path}' not used in shader`)
         }
     }
 
+    function createProxy(obj: any, path = ''): any {
+        return new Proxy(obj, {
+            get(_, prop: string) {
+                const val = obj[prop]
+                if (Array.isArray(val)) return val.map((v, i) => createProxy(v, `${path}${prop}[${i}]`))
+                if (val && typeof val === 'object') return createProxy(val, path ? `${path}${prop}.` : `${prop}.`)
+                return val
+            },
+            set(_, prop: string, v: any) {
+                obj[prop] = v
+                const fullPath = path ? `${path}.${prop}` : prop
+                setUniform(fullPath, v)
+                return true
+            }
+        })
+    }
+    
     if (initial) {
         for (const key in initial) {
-            if (!(key in uniformInfo)) console.warn(`Uniform '${key}' not used in shader`)
-            const uniform = uniformInfo[key]
-            if (uniform) setters[uniform.type](gl, uniform.loc, initial[key])
+            setUniform(key, initial[key])
+            values[key] = initial[key]
         }
     }
-
-    return new Proxy(values, {
-        get: (_, prop: string) => values[prop],
-        set (_, prop: string, v: any) {
-            const info = uniformInfo[prop]
-            if (!info) throw new Error(`Uniform '${prop}' not used in shader`)
-            values[prop] = v
-            setters[info.type](gl, info.loc, v)
-            return true
-        }
-    }) as Expand<Uniforms<T>>
+    return createProxy(values) as Expand<Uniforms<T>>
 }

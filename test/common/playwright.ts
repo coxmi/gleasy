@@ -110,9 +110,9 @@ async function pngFromFile(file: string) {
 export async function updateScreenshots(whitelist?: string[]) {
     const browser = await createBrowser()
 
-    const htmlFiles = glob.sync('examples/*/*.html').filter(path => {
+    const htmlFiles = glob.sync('examples/*/*.html').filter(filepath => {
         if (!whitelist?.length) return true
-        return whitelist.some(w => path.includes(w))
+        return whitelist.some(w => filepath.includes(w))
     })
 
     if (!whitelist) {
@@ -203,9 +203,9 @@ function getExampleInfo(htmlFile) {
 
 export async function compareExamplesWithScreenshots(whitelist?: string[]) {
     const browser = await createBrowser()
-    const exampleHtmlFiles = glob.sync('examples/*/*.html').filter(path => {
+    const exampleHtmlFiles = glob.sync('examples/*/*.html').filter(filepath => {
         if (!whitelist?.length) return true
-        return whitelist.some(w => path.includes(w))
+        return whitelist.some(w => filepath.includes(w))
     })
 
     if (!whitelist) {

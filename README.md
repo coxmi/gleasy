@@ -29,12 +29,12 @@ import { Shader } from 'gleasy'
 // describe uniforms to get type hints
 type Uniforms = { 
    uTransformMatrix: 'mat3'
-   uPos: 'vec3'
+   uColor: 'vec3'
 }
 
 // set initial values
 const shader = new Shader<Uniforms>(gl, vertexSrc, fragmentSrc, {
-   uPos: [0, 0, 0],
+   uColor: [0, 0, 0],
    uTransformMatrix: [...matrix]
 })
 
@@ -51,10 +51,6 @@ shader.use()
 All gl2 uniform types are supported: <br>
 `float` `vec2` `vec3` `vec4` `int` `ivec2` `ivec3` `ivec4` `uint` `uvec2` `uvec3` `uvec4` `bool` `bvec2` `bvec3` `bvec4` `mat2` `mat3` `mat4` `mat2x3` `mat2x4` `mat3x2` `mat3x4` `mat4x2` `mat4x3` `sampler2D` `samplerCube` 
 
-And work with specified lengths for arrays: `float[3]`, `vec3[6]`
-
-Or arrays of unspecified length: `float[]`
-
 Example glsl:
 
 ```
@@ -66,10 +62,20 @@ uniform mat3 uMatrix;
 uniform sampler2D uTex;
 uniform samplerCube uCubeMap;
 uniform vec3 uLightColors[4];
-...
+
+// supports structs too
+struct Light {
+    vec3 position;
+    vec3 color;
+    float radius;
+    float intensity;
+};
+
+// and arrays of structs
+uniform Light uLight[4];
 ```
 
-Types:
+The type object passed into the `Shader<UniformType>(...)` also supports setting array lengths, e.g. `float[]`, or with a specified length `float[3]`
 
 ```ts
 type Uniforms { 
@@ -79,12 +85,24 @@ type Uniforms {
    uMatrix: 'mat3'
    uTex: 'sampler2D'
    uCubeMap: 'samplerCube'
-   uLightColors: 'vec3[4]' 
+   uColorsArray: 'vec3[4]' 
+   uLights: Array<{
+      position: 'vec3'
+      color: 'vec3'
+      radius: 'float'
+   }>
    ...
 }
 
 const shader = new Shader<Uniforms>(gl, vertex, fragment, {
-   uLightColors // number[12]
+   uColorsArray, // typed as number[12]
+   uLights: [
+      { 
+         position, // vec3
+         color, // vec3
+         radius, // float
+      }
+   ]
 })
 ```
 
@@ -116,7 +134,7 @@ const color = new VertexBuffer(gl, [
 ])
 
 // uses unsigned ints with Uint8Array
-const vertexId = new VertexBuffer(gl, new Uint8Array([
+const id = new VertexBuffer(gl, new Uint8Array([
    0, 0, 0,
    1, 1, 1, 
    2, 2, 2 

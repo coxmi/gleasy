@@ -203,7 +203,7 @@ function parseLayouts(input: LayoutArgs) {
         // }
         layout.layout[name] = {
             length: info.row,
-            columns: info ? info.col : 1,
+            columns: info.col,
             offset: layout.stride,
             location: schema.location,
         }
