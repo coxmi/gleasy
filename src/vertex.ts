@@ -1,12 +1,12 @@
-import { TYPE_INFO } from './attributes.ts'
+import { TYPE_SIZE } from './attributes.ts'
 import { glTypeFromTypedArray } from './util.ts'
 import type { TypedArray, UintTypedArray, DrawMode, GLType } from './types.ts'
-import type { AttributeType } from './attributes.ts'
+import type { VertexAttributeType } from './attributes.ts'
 import type { Shader } from './shader.ts'
 
 
 type VertexBufferLayout = Array<{
-    type: AttributeType
+    type: VertexAttributeType
     location: number
 }>
 
@@ -151,12 +151,12 @@ type LayoutArgs = {
     index?: VertexIndex
     layout: 
         | Array<{
-            type: AttributeType
+            type: VertexAttributeType
             buffer?: VertexBuffer
             location: number
         }>
         | Record<string, {
-            type: AttributeType
+            type: VertexAttributeType
             buffer?: VertexBuffer
             location?: number
         }>
@@ -195,19 +195,19 @@ function parseLayouts(input: LayoutArgs) {
         let index = buffers.get(buffer)
         if (index === undefined) buffers.set(buffer, index = buffers.size)
         const layout = layouts[index] ?? (layouts[index] = { buffer, stride: 0, layout: {} })
-        const info = TYPE_INFO[schema.type]
+        const size = TYPE_SIZE[schema.type]
         // TODO: may need compatibility debug message here that takes into consideration buffer's glType
         // and compares it with the options for attribute types (e.g. using a Uint16Array with an int)
         // if (!typeCompatible(buffer.glType, info.gl) {
         //     console.warn(`Mismatched buffer and attribute types: buffer (${buffer.glType}) attribute:${name} (${info.gl})`)
         // }
         layout.layout[name] = {
-            length: info.row,
-            columns: info.col,
+            length: size.row,
+            columns: size.col,
             offset: layout.stride,
             location: schema.location,
         }
-        layout.stride += info.row
+        layout.stride += size.row
     }
 
     let vertices = 0

@@ -22,6 +22,7 @@ const exampleConfig = {
     outdir: 'examples',
     outbase: 'examples',
     bundle: true,
+    sourcemap: true,
     platform: 'browser',
 }
 

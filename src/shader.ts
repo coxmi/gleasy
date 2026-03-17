@@ -1,7 +1,7 @@
 import { createUniforms } from './uniforms.ts'
 import { prettyConsole } from './debug.ts'
 import type { Uniforms, UniformArgs } from './uniforms.ts'
-import type { Expand } from './util.ts'
+import type { Expand } from './types.ts'
 
 /**
  * ```ts

@@ -1,5 +1,5 @@
-import type { Expand } from "./util.ts"
-import type { UniformAttributeType } from "./attributes.ts"
+import type { AttributeType } from './attributes.ts'
+import type { ArrayOfLength, Expand, ScalarOrArray, RepeatTuple } from './types.ts'
 
 
 /**
@@ -26,15 +26,15 @@ type UniformValueMap<C extends number> = {
     bvec3: RepeatTuple<[number, number, number], C>
     bvec4: RepeatTuple<[number, number, number, number], C>
 
-    mat2: RepeatTuple<ArrayLength<number, 4>, C>
-    mat3: RepeatTuple<ArrayLength<number, 9>, C>
-    mat4: RepeatTuple<ArrayLength<number, 16>, C>
-    mat2x3: RepeatTuple<ArrayLength<number, 6>, C>
-    mat2x4: RepeatTuple<ArrayLength<number, 8>, C>
-    mat3x2: RepeatTuple<ArrayLength<number, 6>, C>
-    mat3x4: RepeatTuple<ArrayLength<number, 12>, C>
-    mat4x2: RepeatTuple<ArrayLength<number, 8>, C>
-    mat4x3: RepeatTuple<ArrayLength<number, 12>, C>
+    mat2: RepeatTuple<ArrayOfLength<number, 4>, C>
+    mat3: RepeatTuple<ArrayOfLength<number, 9>, C>
+    mat4: RepeatTuple<ArrayOfLength<number, 16>, C>
+    mat2x3: RepeatTuple<ArrayOfLength<number, 6>, C>
+    mat2x4: RepeatTuple<ArrayOfLength<number, 8>, C>
+    mat3x2: RepeatTuple<ArrayOfLength<number, 6>, C>
+    mat3x4: RepeatTuple<ArrayOfLength<number, 12>, C>
+    mat4x2: RepeatTuple<ArrayOfLength<number, 8>, C>
+    mat4x3: RepeatTuple<ArrayOfLength<number, 12>, C>
 
     sampler2D: ScalarOrArray<number, C>
     samplerCube: ScalarOrArray<number, C>
@@ -53,35 +53,16 @@ type UniformValueMap<C extends number> = {
 type ParseUniformType<S extends string> = S extends `${infer U}[${string}]` ? U : S
 
 // parse out the array length (e.g. 4 from 'vec3[4]')
-type ParseArrayLength<S extends string> = S extends `${string}[${infer N extends number}]` ? N : never
-
-// array of type T, length L
-type ArrayLength<T, L extends number, R extends T[] = []> = 
-    R['length'] extends L 
-        ? R 
-        : ArrayLength<T, L, [...R, T]>
-
-// wrap in array if over 1
-type ScalarOrArray<T extends any, C extends number> = C extends 1 ? T : ArrayLength<T, C>
-
-// repeat a tuple's contents e.g. RepeatTuple<[number], 2> = [number, number]
-type RepeatTuple<
-    T extends unknown[], 
-    N extends number, 
-    Count extends unknown[] = [], 
-    R extends unknown[] = []
-> = Count['length'] extends N 
-    ? R 
-    : RepeatTuple<T, N, [...Count, unknown], [...R, ...T]>
+type ParseArrayOfLength<S extends string> = S extends `${string}[${infer N extends number}]` ? N : never
 
 // detect array length vec3[x], or fall back to single vec3
 type UniformValue<T extends string> =
-    ParseUniformType<T> extends UniformAttributeType
-        ? ParseArrayLength<T> extends never
+    ParseUniformType<T> extends AttributeType
+        ? ParseArrayOfLength<T> extends never
             ? T extends `${string}[]`
                 ? number[]
                 : UniformValueMap<1>[ParseUniformType<T> & keyof UniformValueMap<1>]
-            : UniformValueMap<ParseArrayLength<T>>[ParseUniformType<T> & keyof UniformValueMap<ParseArrayLength<T>>]
+            : UniformValueMap<ParseArrayOfLength<T>>[ParseUniformType<T> & keyof UniformValueMap<ParseArrayOfLength<T>>]
         : never
 
 // deal with struct types recursively
@@ -93,9 +74,9 @@ type NestedStructs<T> =
 
 // allowed user input vec3 / vec3[] / vec3[4]
 export type UniformTypeWithSizes = 
-    | UniformAttributeType
-    | `${UniformAttributeType}[${number}]`
-    | `${UniformAttributeType}[]`
+    | AttributeType
+    | `${AttributeType}[${number}]`
+    | `${AttributeType}[]`
 
 
 export type UniformArgValue =
@@ -178,6 +159,7 @@ export function createUniforms<T extends UniformArgs>(
             const setter = setters[info.type]
             if (!setter) return console.warn('Unsupported uniform type:', info.type, path)
             setter(gl, info.loc, value)
+            // values[path] = value
         } else if (Array.isArray(value)) {
             // struct array
             value.map((v, i) => setUniform(`${path}[${i}]`, v))
@@ -212,5 +194,6 @@ export function createUniforms<T extends UniformArgs>(
             values[key] = initial[key]
         }
     }
+
     return createProxy(values) as Expand<Uniforms<T>>
 }
