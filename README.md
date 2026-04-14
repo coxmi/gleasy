@@ -102,13 +102,14 @@ const shader = new Shader<Uniforms>(gl, vertex, fragment, {
          color, // vec3
          radius, // float
       }
-   ]
+   ],
+   ...more
 })
 ```
 
 ### `VertexBuffer`
 
-Vertex data can be interleaved, or be spread across multiple buffers. You can pass a TypedArray directly, or it will default to a `Float32Array` when called with a standard array type:
+Supports interleaved data or multiple buffers. You can pass a TypedArray directly, or it will default to a `Float32Array` when called with a standard array type:
 
 ```ts
 import { VertexBuffer } from 'gleasy'
@@ -145,7 +146,7 @@ You can pass in other typed arrays to the constructor:<br>
 `Int8Array`, `Int16Array`, `Int32Array`, 
 `Uint8Array`, `Uint16Array`, `Uint32Array`, `Uint8ClampedArray`. 
 
-These can generally be used for integer types in your shader (`uint`, `int`, `uvec3`, `ivec3`, etc).
+These can generally be used for integer types in your shader (`uint`, `int`, `uvec3`, `ivec3`, etc), or for using smaller data types when casting to normalized values.
 
 ### `VAO` / Vertex array objects
 
@@ -194,47 +195,26 @@ const vao = new VAO(gl, {
    ]
 })
 
-// draw
-shader.use()
-vao.bind()
-vao.draw()
+
+// you can also normalize values to the -1 to 1 range for signed arrays
+const position = new VertexBuffer(gl, new Int8Array([
+	0, 127, 0,   -127, -127, 0,   127, -127, 0
+]))
+
+// or 0–1 for unsigned arrays
+const color = new VertexBuffer(gl, new Uint8Array([
+   255, 0, 0,   0, 255, 0,   0, 0, 255
+]))
+
+const vao = new VAO(gl, shader, {
+   layout: { 
+      aPosition: { type: 'vec3', buffer: position, normalize: true }, 
+      aColor: { type:'vec3', buffer: color, normalize: true }
+   }
+})
 
 ```
 
-### Vertex attribute layouts
-
-Attribute layouts can also be described directly on the VertexBuffer and used in draw calls directly, if you really want.
-
-In your vertex shader:
-
-```
-layout(location=0) in vec3 aPosition;
-layout(location=1) in vec3 aColor;
-```
-
-In your program:
-
-```ts
-const vertices = new VertexBuffer(gl, array)
-
-// describe the vertex attribute layout
-// using attribute locations
-vertices.setLayout([
-   { type: 'vec3', location: 0 },
-   { type: 'vec3', location: 1 },
-])
-
-// create and use a shader
-shader.use()
-
-// explicit call to bind layout
-vertices.bindLayout()
-
-// draw directly from vertices
-vertices.bind()
-vertices.draw()
-
-```
 
 ### `VertexIndex`
 
@@ -360,6 +340,41 @@ The GL viewport should match the canvas, set this with:
 import { setGLViewport } from 'gleasy'
 const gl = canvas.getContext('webgl2')
 setGLViewport(gl, canvas)
+```
+
+### Vertex attribute layouts
+
+Attribute layouts can also be described directly on the VertexBuffer and used in draw calls directly, if you really want.
+
+In your vertex shader:
+
+```
+layout(location=0) in vec3 aPosition;
+layout(location=1) in vec3 aColor;
+```
+
+In your program:
+
+```ts
+const vertices = new VertexBuffer(gl, array)
+
+// describe the vertex attribute layout
+// using attribute locations
+vertices.setLayout([
+   { type: 'vec3', location: 0 },
+   { type: 'vec3', location: 1 },
+])
+
+// create and use a shader
+shader.use()
+
+// explicit call to bind layout
+vertices.bindLayout()
+
+// draw directly from vertices
+vertices.bind()
+vertices.draw()
+
 ```
 
 

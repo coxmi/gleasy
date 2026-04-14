@@ -8,7 +8,8 @@ import { PNG } from 'pngjs'
 import pixelmatch from 'pixelmatch'
 
 
-// Script runner (only runs when called directly from cli, e.g. from npm scripts)
+// Script runner - only runs when called directly from cli, e.g.
+// $ npm run screenshots {searchTerm}
 
 if (import.meta.url === `file://${process.argv[1]}`) {
     const arg = process.argv[2]

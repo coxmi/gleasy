@@ -77,6 +77,31 @@ function multipleBuffers() {
 }
 
 
+function normalizedValues() {
+    const shader = new Shader(gl, vertexSrc, fragmentSrc)
+
+    const vertex = new VertexBuffer(gl, new Int8Array([
+           0,  127, 0,
+        -127, -127, 0,
+         127, -127, 0,
+    ]))
+    const color = new VertexBuffer(gl, new Uint8Array([
+        255, 0, 0, 
+        0, 255, 0, 
+        0, 0, 255 
+    ]))
+    const vao = new VAO(gl, shader, {
+        layout: {
+            aPosition: { type: 'vec3', buffer: vertex, normalize: true },
+            aColor: { type: 'vec3', buffer: color, normalize: true },
+        }
+    })
+    shader.use()
+    vao.bind()
+    vao.draw()
+}
+
+
 function iuTypes() {
     const vertexSrc = `
         #version 300 es
@@ -746,6 +771,8 @@ window.saveRenderResult = () => saveRenderResult(gl)
 window.interleavedAttributes = interleavedAttributes
 // @ts-ignore
 window.multipleBuffers = multipleBuffers
+// @ts-ignore
+window.normalizedValues = normalizedValues
 // @ts-ignore
 window.iuTypes = iuTypes
 // @ts-ignore
