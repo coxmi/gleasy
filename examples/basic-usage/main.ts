@@ -109,7 +109,6 @@ function instances() {
         in vec2 aCoord;
         in vec3 aColor;
         out vec3 vColor;
-        uniform vec2 uResolution;
         void main() {
             vColor = aColor;
             gl_Position = vec4(aCoord + aPos, 0., 1.);
@@ -122,26 +121,32 @@ function instances() {
         in vec3 vColor;
         out vec4 outColor;
         void main() {
-            outColor = vec4(vColor, 1.);
+            outColor = vec4(vColor, 0.7);
         }
     `
 
+    // three vertices (the triangle)
     const vertex = new VertexBuffer(gl, new Float32Array([
          0.0,  0.5,  
         -0.5, -0.5,
          0.5, -0.5,
     ]))
 
+    // six instanced positions (centres of triangles)
     const instancePos = new VertexBuffer(gl, new Float32Array([
-        -0.5, -0.5,
-        0, 0,
-        0.5, 0.5,
+        -1, 0,
+        -0.6, 0,
+        -0.2, 0,
+         0.2, 0,
+         0.6, 0,
+         1, 0,
     ]))
 
+    // three instanced colours
     const instanceColor = new VertexBuffer(gl, new Float32Array([
         1, 0, 0,
-        0, 1, 0,
-        0, 0, 1
+        0.4, 0, 0.5,
+        0, 0, 1,
     ]))
 
     const shader = new Shader(gl, vertexSrc, fragmentSrc)
@@ -149,10 +154,14 @@ function instances() {
         buffer: vertex,
         layout: {
             aPos: { type: 'vec2' },
-            aCoord: { type: 'vec2', buffer: instancePos, divisor: 1 },
-            aColor: { type: 'vec3', buffer: instanceColor, divisor: 1 }
+            aCoord: { type: 'vec2', buffer: instancePos, step: 1 },
+            aColor: { type: 'vec3', buffer: instanceColor, step: 2 }
         }
     })
+
+    // opacity blend
+    gl.enable(gl.BLEND)
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA)
 
     shader.use()
     vao.bind()
@@ -363,7 +372,7 @@ function uniforms() {
     // use type hints for uniforms, and set initial values
     type Uniforms = { uMovePos: 'vec3' }
     const shader = new Shader<Uniforms>(gl, vertexSrc, fragmentSrc, {
-        uMovePos: [0.5, 0.5, 0.5]
+        uMovePos: [0.25, 0.25, 0.25]
     })
 
     const buffer = new VertexBuffer(gl, [ 
@@ -379,9 +388,11 @@ function uniforms() {
         }
     })
     shader.use()
-    // update uniforms before each draw call with:
-    // shader.uniforms.uMovePos = [0.4, 0.4, 0.4]
     vao.bind()
+    vao.draw()
+
+    // update uniforms, and draw a second:
+    shader.uniforms.uMovePos = [0.5, 0.5, 0.5]
     vao.draw()
 }
 

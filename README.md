@@ -213,6 +213,17 @@ const vao = new VAO(gl, shader, {
    }
 })
 
+// or use instancing with `step`:
+const vao = new VAO(gl, shader, {
+   layout: { 
+      // change position every vertex
+      aPosition: { type: 'vec3', buffer: position }, 
+      // advance colour every 3 instances
+      aColor: { type:'vec3', buffer: color, step: 3 }
+   }
+})
+vao.draw()
+
 ```
 
 

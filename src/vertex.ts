@@ -12,14 +12,13 @@ type VertexSchema = {
     buffer?: VertexBuffer
     location?: number
     normalize?: boolean
+    // two names for divisor, remove this later
     divisor?: number
+    step?: number
 }
 
-type VertexSchemaWithLocation = { 
-    buffer?: VertexBuffer
+type VertexSchemaWithLocation = VertexSchema & { 
     location: number
-    normalize?: boolean
-    divisor?: number
 }
 
 type VertexLayoutArgs = {
@@ -38,17 +37,21 @@ type SingleVertexLayoutArgs = VertexLayoutArray<VertexSchemaWithLocation>
 
 // parsed node
 
+type VertexBindingFields = {
+    divisor: number
+}
+
 type ParsedVertexFields = { 
     path: string
     buffer?: VertexBuffer
     location?: number
     normalize: boolean
-    divisor?: number
 }
 
 type ParsedVertexLayout = ParsedLayout<
     VertexSchema, 
-    ParsedVertexFields, 
+    ParsedVertexFields,
+    VertexBindingFields, 
     Layout<VertexSchema>
 >
 
@@ -158,28 +161,35 @@ export class VertexIndex {
 }
 
 function parseVertexLayout(config: VertexLayoutArgs) {
-    // TODO: work out proper logic for instance buffers, this is a quick fix
-    const instanceBuffers = new Set<any>()
-    const layout = parseLayout<VertexSchema, ParsedVertexFields>(config.layout, config.buffer, (node, path) => {
-        if (node.divisor) instanceBuffers.add(node.buffer)
+    const layout = parseLayout<VertexSchema, ParsedVertexFields, VertexBindingFields>(config.layout, config.buffer, (node, path, binding) => {
+        // per buffer, check all instance divisors are equal
+        // (no support for mixed instance steps per buffer)
+        const divisor = node.divisor ?? node.step ?? 0
+        if (binding.divisor === undefined) binding.divisor = divisor
+        if (binding.divisor !== divisor) console.warn('buffers with mixed instance steps are not supported')
         return { 
             path, 
             location: node?.location, 
             normalize: !!node.normalize,
-            divisor: node?.divisor
         }
     }) 
 
-    let instances = 0
+    let instances = Infinity
     let vertices = 0
-    for (const { buffer, stride } of layout.bindings) {
+    for (const { buffer, stride, divisor } of layout.bindings) {
         const elements = buffer.count / stride
         const errName = `${buffer.constructor.name} – ${buffer.buffer.constructor.name}(elements:${buffer.count})`
 
-        // TODO: add tests for instances, this is a quick fix
-        if (instanceBuffers.has(buffer)) {
-            if (!instances) instances = elements
-            if (elements !== instances) console.warn(`${errName}: instance count does not match other buffers`)
+        // validate instance could is equal for each instance buffer
+        if (divisor > 0) {
+            const capacity = elements * divisor
+            if (instances === Infinity) {
+                instances = capacity
+            } else {
+                if (capacity !== instances) 
+                    console.warn(`instanced attributes have inconsistent capacity: received ${capacity}, but expected ${instances} (from ${elements} elements)`)
+                instances = Math.min(instances, capacity)    
+            }
             continue   
         }
 
@@ -198,7 +208,7 @@ function parseVertexLayout(config: VertexLayoutArgs) {
     // @ts-expect-error
     layout.vertices = vertices
     // @ts-expect-error
-    layout.instances = instances
+    layout.instances = instances < Infinity ? instances : 0
     return layout
 }
 
@@ -207,10 +217,10 @@ function bindVertexLayout(
     parsedLayout: ParsedVertexLayout, 
     program?: WebGLProgram
 ): void {
-    for (const { buffer, stride, layout } of parsedLayout.bindings) {
+    for (const { buffer, stride, layout, divisor } of parsedLayout.bindings) {
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer.buffer)
         for (const attribute of layout) {
-            const { type, path, location, normalize, size, col, offset, divisor } = attribute
+            const { type, path, location, normalize, size, col, offset } = attribute
             const attribLocation = location ?? (program ? gl.getAttribLocation(program, path) : -1)
             if (attribLocation < 0) {
                 console.warn(
@@ -238,7 +248,7 @@ function bindVertexLayout(
                         str, off
                     )
                 }
-                if (divisor !== undefined) gl.vertexAttribDivisor(attribLocation + i, divisor)
+                if (divisor > 0) gl.vertexAttribDivisor(attribLocation + i, divisor)
             }
         }
     }

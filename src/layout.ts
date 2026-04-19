@@ -51,11 +51,11 @@ export type VertexLayoutArray<InputFields> = Record<number, ScalarNode<InputFiel
 
 // parsed/output types
 
-type BindingInfo<OutputFields> = {
+type BindingInfo<OutputFields, BindingFields> = {
     stride: number,
     buffer: Binding,
     layout: Array<ParsedAttributeInfo<OutputFields>>
-}
+} & BindingFields
 
 type ParsedAttributeInfo<OutputFields> = {
     type: AttributeType
@@ -96,9 +96,10 @@ type ParsedNode<Node extends LayoutNode<F>, OutputFields, F = {}> =
 export type ParsedLayout<
     InputFields, 
     OutputFields,
+    BindingFields,
     L extends Layout<InputFields>,
 > = {
-    bindings: Array<BindingInfo<OutputFields>>
+    bindings: Array<BindingInfo<OutputFields, BindingFields>>
     attributes: {
         [K in keyof L]: ParsedNode<L[K], OutputFields>    
     }
@@ -107,10 +108,10 @@ export type ParsedLayout<
 
 // convert node into parsed tree
 
-type LayoutCtx<InputFields, OutputFields> = {
+type LayoutCtx<InputFields, OutputFields, BindingFields> = {
     buffer?: Binding,
-    bufferInfo: Map<Binding, BindingInfo<OutputFields>>,
-    meta: (node: ScalarNode<InputFields>, path: string) => OutputFields
+    bindingInfo: Map<Binding, BindingInfo<OutputFields, BindingFields>>,
+    meta: (node: ScalarNode<InputFields>, path: string, bindingInfo: BindingInfo<OutputFields, BindingFields>) => OutputFields
 }
 
 // type LayoutOptions = {
@@ -120,35 +121,37 @@ type LayoutCtx<InputFields, OutputFields> = {
 function computeLayout<
     InputFields,
     OutputFields,
+    BindingFields,
     Node extends LayoutNode<InputFields> = LayoutNode<InputFields>
 >(
     node: Node,
     path: string = '',
-    ctx: LayoutCtx<InputFields, OutputFields>,
+    ctx: LayoutCtx<InputFields, OutputFields, BindingFields>,
     isRoot: boolean = false
 ): ParsedNode<Node, OutputFields> {
 
-    const { bufferInfo, meta } = ctx
+    const { bindingInfo, meta } = ctx
     const buffer = ctx.buffer = node.buffer = (isRoot ? node.buffer : ctx.buffer) || ctx.buffer
     if (buffer === undefined) throw new Error(`No buffer set for ${path}`)
 
-    const binding = getOrInsert(bufferInfo, buffer, {
+    const binding = getOrInsert(bindingInfo, buffer, {
         buffer,
         stride: 0,
         layout: []
-    })
+    } as BindingInfo<OutputFields, BindingFields>)
 
     if (node.type in GLSL_TYPES) {
         const { row: logicalSize, col } = TYPE_SIZE[node.type as VertexAttributeType]
+        const stride = binding.stride
         const attr: ParsedAttributeInfo<OutputFields> = {
             type: node.type as AttributeType, // is type required?
             path, 
             buffer,
-            offset: binding.stride,
+            offset: stride,
             size: logicalSize, 
             col, 
-            align: 0,            
-            ...meta(node as ScalarNode<InputFields>, path)
+            align: stride,            
+            ...meta(node as ScalarNode<InputFields>, path, binding)
         }
         binding.layout.push(attr)
         binding.stride += logicalSize
@@ -158,33 +161,38 @@ function computeLayout<
     } else if (node.type === 'array') {
         const array: any = []
         for (let i = 0; i < node.length; i++)
-            array[i] = computeLayout<InputFields, OutputFields>(node.element, `${path}[${i}]`, ctx)
+            array[i] = computeLayout<InputFields, OutputFields, BindingFields>(node.element, `${path}[${i}]`, ctx)
         return array
     } else if (node.type === 'struct') {
         const struct: any = {}
         for (const key in node.fields)
-            struct[key] = computeLayout<InputFields, OutputFields>(node.fields[key], `${path}.${key}`, ctx)
+            struct[key] = computeLayout<InputFields, OutputFields, BindingFields>(node.fields[key], `${path}.${key}`, ctx)
         return struct
     }
     throw new Error(`Type not supported: ${node.type}`)
 }
 
 
-export function parseLayout<InputFields, OutputFields, const L extends Layout<InputFields> = Layout<InputFields>>(
+export function parseLayout<
+    InputFields, 
+    OutputFields, 
+    BindingFields,
+    const L extends Layout<InputFields> = Layout<InputFields>
+>(
     layout: L,
     defaultBuffer: Binding,
-    meta: (node: ScalarNode<InputFields>, path: string) => OutputFields,
+    meta: (node: ScalarNode<InputFields>, path: string, buffer: BindingInfo<OutputFields, BindingFields>) => OutputFields,
 ) {
-    const ctx: LayoutCtx<InputFields, OutputFields> = {
+    const ctx: LayoutCtx<InputFields, OutputFields, BindingFields> = {
        buffer: defaultBuffer,
-       bufferInfo: new Map(),
+       bindingInfo: new Map(),
        meta,
     }
     const attributes: any = {}
-    for (const key in layout) attributes[key] = computeLayout<InputFields, OutputFields>(layout[key], key, ctx, true)
-    const parsed: ParsedLayout<InputFields, OutputFields, L> = { 
+    for (const key in layout) attributes[key] = computeLayout<InputFields, OutputFields, BindingFields>(layout[key], key, ctx, true)
+    const parsed: ParsedLayout<InputFields, OutputFields, BindingFields, L> = { 
         attributes: attributes,
-        bindings: [...ctx.bufferInfo.values()],
+        bindings: [...ctx.bindingInfo.values()],
     }
     return parsed
 }
@@ -266,7 +274,7 @@ export function proxyFromLayout<InputFields, OutputFields = {}, const L extends 
     },
 ) {
     const { meta, get, set } = options
-    const { attributes } = parseLayout<InputFields, OutputFields>(layout, buffer, meta || (() => {}))
+    const { attributes } = parseLayout<InputFields, OutputFields, {}>(layout, buffer, meta || (() => {}))
     return proxyGraph(attributes, get, set) as Expand<DeepMutable<ParsedProxyLayout<L>>>
 }
 
@@ -311,6 +319,8 @@ function proxyGraph<N, V>(
             // get node info and return proxy if it's not a leaf node
             const attr = node[info]
             if (attr === undefined) return getChild(node)
+            // TODO: test Uncaught TypeError: 'set' on proxy: trap returned falsish for property 'x'
+            // when shader not using variable
             return get(attr)
         },
         set(t, prop: string, value: any) {
