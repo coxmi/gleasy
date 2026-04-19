@@ -8,18 +8,6 @@ import { PNG } from 'pngjs'
 import pixelmatch from 'pixelmatch'
 
 
-// Script runner - only runs when called directly from cli, e.g.
-// $ npm run screenshots {searchTerm}
-
-if (import.meta.url === `file://${process.argv[1]}`) {
-    const arg = process.argv[2]
-    if (arg === '--update-screenshots') {
-        const whitelist = process.argv.length > 3 && process.argv.slice(3) || undefined
-        updateScreenshots(whitelist)
-    }
-}
-
-
 export async function createBrowser(debug = false) {
     const debugOptions = {
         headless: false, 
@@ -184,7 +172,7 @@ export async function compareWithScreenshot(
 }
 
 
-function getExampleInfo(htmlFile) {
+export function getExampleInfo(htmlFile) {
     let fileNameBase = path.basename(htmlFile).replace(/\.html$/, '')
     if (fileNameBase === 'index') fileNameBase = ''
     const folderName = path.dirname(htmlFile)
@@ -194,6 +182,7 @@ function getExampleInfo(htmlFile) {
         throw new Error(`No file exists at: ${path.relative(process.cwd(), htmlPath)}`)
     }
     return {
+        name: path.join(folderName, fileNameBase),
         fileNameBase, 
         folderName, 
         path: htmlPath, 

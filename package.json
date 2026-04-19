@@ -33,7 +33,7 @@
     "types": "tsc --project tsconfig.json --noEmit false --declaration --emitDeclarationOnly --outDir dist",
     "build": "npm run types && node build.js && npm run size",
     "ci": "npm run types && node build.js && npm run test",
-    "screenshots": "node --require ts-node/register test/common/playwright.ts --update-screenshots",
+    "screenshots": "node --require ts-node/register tools/update-screenshots.ts",
     "size": "node --require ts-node/register tools/readme-size.ts"
   },
   "devDependencies": {
