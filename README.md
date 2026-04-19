@@ -1,21 +1,97 @@
 # gleasy
 
-A lightweight (4.7kb) wrapper over webgl2, with no dependenices.
+A lightweight (4.7kb), fully-typed, wrapper over webgl2 with no dependenices.
 
 You'll need to know WebGL concepts, but won't have to think about binding attribute pointers and uniforms. The main primitives are designed to be as flexible as possible, while abstracting away a lot of the boilerplate.
 
+
+## Quickstart
+
+### Install
+
+```sh
+npm install gleasy
+```
+
+
+### Draw your first triangle
+
+<img src="https://raw.githubusercontent.com/coxmi/gleasy/refs/heads/main/test/screenshots/examples/basic-usage-interleaved-attributes.png" style="max-width:100%; width:400px; height:auto;">
+
+```ts
+import { Shader, VertexBuffer, VAO, setGLViewport } from 'gleasy'
+
+// get your canvas, gl context, and set the viewport size
+const canvas = document.getElementById('canvas')
+const gl = canvas.getContext('webgl2')
+setGLViewport(gl, canvas)
+
+// create your shader program
+const vertex = `
+   #version 300 es
+   in vec3 aPosition;
+   in vec3 aColor;
+   out vec3 vColor;
+   void main() {
+      gl_Position = vec4(aPosition, 1.0);
+      vColor = aColor;
+   }
+`
+const frag = `
+   #version 300 es
+   precision highp float;
+   in vec3 vColor;
+   out vec4 outColor;
+   void main() {
+      outColor = vec4(vColor, 1.0);
+   }
+`
+
+const shader = new Shader(gl, vertex, frag)
+
+// triangle position and colour vertices
+const buffer = new VertexBuffer(gl, [
+    // xyz            // rgb
+    0.0,  0.5, 0.0,   1.0, 0.0, 0.0, 
+   -0.5, -0.5, 0.0,   0.0, 1.0, 0.0, 
+    0.5, -0.5, 0.0,   0.0, 0.0, 1.0 
+])
+
+// describe the vertex buffer layout
+const vao = new VAO(gl, shader, {
+   buffer,
+   layout: {
+      aPosition: { type: 'vec3' },
+      aColor: { type: 'vec3' },
+   }
+})
+
+// draw!
+shader.use()
+vao.bind()
+vao.draw()
+```
+
+
+
+See the examples in [examples/basic-usage](https://github.com/coxmi/gleasy/tree/main/examples/basic-usage) and [main.ts](https://github.com/coxmi/gleasy/blob/main/examples/basic-usage/main.ts) to see how the various APIs described below are used.
+
+
 ---
+
+
+## Documentation
 
 ### `Shader`
 
-Create a shader with automatic uniform setters:
+Create a shader with fully-typed uniforms and setters.
 
 In your vertex shader:
 
 ```
 #version 300 es
-uniform mat3 uTransformMatrix;
 uniform vec3 uPos;
+uniform mat3 uTransformMatrix;
 void main() { 
    gl_Position = vec4(uTransformMatrix * uPos, 1.)
 }
@@ -24,22 +100,24 @@ void main() {
 In your program:
 
 ```ts
-import { Shader } from 'gleasy'
-
 // describe uniforms to get type hints
 type Uniforms = { 
+   uPos: 'vec3'
    uTransformMatrix: 'mat3'
-   uColor: 'vec3'
 }
 
 // set initial values
 const shader = new Shader<Uniforms>(gl, vertexSrc, fragmentSrc, {
-   uColor: [0, 0, 0],
-   uTransformMatrix: [...matrix]
+   uPos: [0, 0, 0],
+   uTransformMatrix: [
+      1, 0, 0,
+      0, 1, 0,
+      0, 0, 1
+   ]
 })
 
 // update uniform values later
-shader.uniforms.uTransformMatrix = [...transformedMatrix]
+shader.uniforms.uTransformMatrix = [...transformMatrix]
 
 // before the draw call
 shader.use()
@@ -48,8 +126,11 @@ shader.use()
 
 #### Uniform types
 
-All gl2 uniform types are supported: <br>
+Shaders support the full range of GL uniform types:
+
+
 `float` `vec2` `vec3` `vec4` `int` `ivec2` `ivec3` `ivec4` `uint` `uvec2` `uvec3` `uvec4` `bool` `bvec2` `bvec3` `bvec4` `mat2` `mat3` `mat4` `mat2x3` `mat2x4` `mat3x2` `mat3x4` `mat4x2` `mat4x3` `sampler2D` `samplerCube` 
+
 
 Example glsl:
 
@@ -62,6 +143,7 @@ uniform mat3 uMatrix;
 uniform sampler2D uTex;
 uniform samplerCube uCubeMap;
 uniform vec3 uLightColors[4];
+...more
 
 // supports structs too
 struct Light {
@@ -87,7 +169,7 @@ type Uniforms {
    uCubeMap: 'samplerCube'
    uColorsArray: 'vec3[4]' 
    uLights: Array<{
-      position: 'vec3'
+      pos: 'vec3'
       color: 'vec3'
       radius: 'float'
    }>
@@ -95,27 +177,28 @@ type Uniforms {
 }
 
 const shader = new Shader<Uniforms>(gl, vertex, fragment, {
-   uColorsArray, // typed as number[12]
-   uLights: [
-      { 
-         position, // vec3
-         color, // vec3
-         radius, // float
-      }
-   ],
-   ...more
+   uTime, // number
+   uPos, // number[2]
+   uColor, // number[3]
+   uMatrix, // number[9]
+   uTex, uCubeMap// number
+   uColorsArray, // number[12]
+   
+   // { pos: number[3], color: number[3], radius: number }[]
+   uLights: [{ pos, color, radius }],
+   ...
 })
 ```
 
 ### `VertexBuffer`
 
-Supports interleaved data or multiple buffers. You can pass a TypedArray directly, or it will default to a `Float32Array` when called with a standard array type:
+Supports interleaved data and multiple buffers. You can use TypedArrays directly, or default to using `Float32Array` when a standard array is passed in. 
 
 ```ts
 import { VertexBuffer } from 'gleasy'
 
-// interleaved
-const vertices = new VertexBuffer(gl, new Float32Array([
+// interleaved float 32s
+const vertices = new VertexBuffer(gl, Float32Array([
    // x,y,z         // r,g,b
    0.0,  0.5, 0.0,  1.0, 0.0, 0.0, 
   -0.5, -0.5, 0.0,  0.0, 1.0, 0.0, 
@@ -128,13 +211,14 @@ const position = new VertexBuffer(gl, [
   -0.5, -0.5, 0.0,  
    0.5, -0.5, 0.0,  
 ])
+
 const color = new VertexBuffer(gl, [
    1.0, 0.0, 0.0,
    0.0, 1.0, 0.0, 
    0.0, 0.0, 1.0 
 ])
 
-// uses unsigned ints with Uint8Array
+// unsigned ints with Uint8Array
 const id = new VertexBuffer(gl, new Uint8Array([
    0, 0, 0,
    1, 1, 1, 
@@ -142,24 +226,21 @@ const id = new VertexBuffer(gl, new Uint8Array([
 ]))
 ```
 
-You can pass in other typed arrays to the constructor:<br>
-`Int8Array`, `Int16Array`, `Int32Array`, 
-`Uint8Array`, `Uint16Array`, `Uint32Array`, `Uint8ClampedArray`. 
+Other typed arrays can generally be used for integer types in your shader (`uint`, `int`, `uvec3`, `ivec3`, etc), or for using smaller data types when casting to normalized values:
 
-These can generally be used for integer types in your shader (`uint`, `int`, `uvec3`, `ivec3`, etc), or for using smaller data types when casting to normalized values.
+`Int8Array`, `Int16Array`, `Int32Array`, `Uint8Array`, `Uint16Array`, `Uint32Array`, `Uint8ClampedArray`.
+
 
 ### `VAO` / Vertex array objects
 
-Get attribute names/locations from the shader program:
+Describe your buffer layout, and get reflected attribute names/locations from the shader program:
 
 ```ts
-import { Shader, VAO } from 'gleasy'
-
-const vertices = new VertexBuffer(gl, array)
+const vertices = new VertexBuffer(gl,[0,0,0, 1,0,0, ...])
 const shader = new Shader(gl, vertex, fragment)
 
-// describe the vertex attribute layout on 
-// the VAO for automatic attribute binding
+// describe the vertex attribute layout using the
+// attribute names in your shader (e.g. aPosition, aColor)
 const vao = new VAO(gl, shader, {
    buffer: vertices,
    layout: { 
@@ -175,7 +256,7 @@ vao.draw()
 
 ```
 
-You can use separate buffers or manually specify attribute locations for better flexibility:
+Supports can use separate buffers:
 
 ```ts
 // set a separate buffer for each attribute:
@@ -185,17 +266,37 @@ const vao = new VAO(gl, shader, {
       aColor: { type:'vec3', buffer: color }
    }
 })
+```
 
-// and/or use location indexes (don't pass a shader):
+Manually-specified attribute locations:
+
+``` 
+   #version 300 es
+   layout(location = 0) in vec3 aPosition;
+   layout(location = 1) in vec3 aColor;
+   out vec3 vColor;
+   void main() {
+      gl_Position = vec4(aPosition, 1.0);
+      vColor = aColor;
+   }
+```
+
+```
+// use location indexes (don't pass a shader):
 const vao = new VAO(gl, {
    buffer: position, // default buffer
    layout: [
-      { type: 'vec3', location: 0 }, // position buffer at location 0
-      { type: 'vec3', location: 1, buffer: color } // color buffer at location 1
+      // position buffer at location 0
+      { type: 'vec3', location: 0 },
+      // color buffer at location 1 
+      { type: 'vec3', location: 1, buffer: color } 
    ]
 })
+```
 
+Normalize values:
 
+```
 // you can also normalize values to the -1 to 1 range for signed arrays
 const position = new VertexBuffer(gl, new Int8Array([
 	0, 127, 0,   -127, -127, 0,   127, -127, 0
@@ -212,8 +313,10 @@ const vao = new VAO(gl, shader, {
       aColor: { type:'vec3', buffer: color, normalize: true }
    }
 })
+```
 
-// or use instancing with `step`:
+Or use instancing with `step`:
+```
 const vao = new VAO(gl, shader, {
    layout: { 
       // change position every vertex
@@ -222,7 +325,6 @@ const vao = new VAO(gl, shader, {
       aColor: { type:'vec3', buffer: color, step: 3 }
    }
 })
-vao.draw()
 
 ```
 
