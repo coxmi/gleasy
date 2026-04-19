@@ -77,10 +77,8 @@ vao.draw()
 See the examples in [examples/basic-usage](https://github.com/coxmi/gleasy/tree/main/examples/basic-usage) and [main.ts](https://github.com/coxmi/gleasy/blob/main/examples/basic-usage/main.ts) to see how the various APIs described below are used.
 
 
----
 
-
-## Documentation
+# Documentation
 
 ### `Shader`
 
@@ -88,7 +86,7 @@ Create a shader with fully-typed uniforms and setters.
 
 In your vertex shader:
 
-```
+```glsl
 #version 300 es
 uniform vec3 uPos;
 uniform mat3 uTransformMatrix;
@@ -134,7 +132,7 @@ Shaders support the full range of GL uniform types:
 
 Example glsl:
 
-```
+```glsl
 #version 300 es
 uniform float uTime;
 uniform vec2 uPos;
@@ -233,7 +231,7 @@ Other typed arrays can generally be used for integer types in your shader (`uint
 
 ### `VAO` / Vertex array objects
 
-Describe your buffer layout, and get reflected attribute names/locations from the shader program:
+Describe your buffer layout to get automatic attribute binding from the shader program:
 
 ```ts
 const vertices = new VertexBuffer(gl,[0,0,0, 1,0,0, ...])
@@ -249,14 +247,16 @@ const vao = new VAO(gl, shader, {
    }
 })
 
-// draw
+// use the shader
 shader.use()
+
+// bind and draw the VAO
 vao.bind()
 vao.draw()
 
 ```
 
-Supports can use separate buffers:
+The layout definition supports attributes from separate buffers:
 
 ```ts
 // set a separate buffer for each attribute:
@@ -268,41 +268,39 @@ const vao = new VAO(gl, shader, {
 })
 ```
 
-Manually-specified attribute locations:
+Attribute locations can be specified manually using `layout(location = 0)` in your shader program, and `location: 0` in the attribute definition:
 
-``` 
-   #version 300 es
-   layout(location = 0) in vec3 aPosition;
-   layout(location = 1) in vec3 aColor;
-   out vec3 vColor;
-   void main() {
-      gl_Position = vec4(aPosition, 1.0);
-      vColor = aColor;
-   }
+```glsl
+#version 300 es
+layout(location = 0) in vec3 aPosition;
+layout(location = 1) in vec3 aColor;
+out vec3 vColor;
+void main() {
+   gl_Position = vec4(aPosition, 1.0);
+   vColor = aColor;
+}
 ```
 
-```
-// use location indexes (don't pass a shader):
+```ts
+// no need to pass in a shader:
 const vao = new VAO(gl, {
    buffer: position, // default buffer
    layout: [
-      // position buffer at location 0
-      { type: 'vec3', location: 0 },
-      // color buffer at location 1 
-      { type: 'vec3', location: 1, buffer: color } 
+      { type: 'vec3', location: 0 }, // default buffer, location 0
+      { type: 'vec3', location: 1, buffer: color } // color buffer, location 1 
    ]
 })
 ```
 
-Normalize values:
+Integer values can be normalized with `normalize: true`:
 
-```
-// you can also normalize values to the -1 to 1 range for signed arrays
+```ts
+// signed integers normalize to the -1 to 1 range
 const position = new VertexBuffer(gl, new Int8Array([
 	0, 127, 0,   -127, -127, 0,   127, -127, 0
 ]))
 
-// or 0–1 for unsigned arrays
+// unsigned integers normalize to 0–1
 const color = new VertexBuffer(gl, new Uint8Array([
    255, 0, 0,   0, 255, 0,   0, 0, 255
 ]))
@@ -315,8 +313,9 @@ const vao = new VAO(gl, shader, {
 })
 ```
 
-Or use instancing with `step`:
-```
+Use instancing with `step`:
+
+```ts
 const vao = new VAO(gl, shader, {
    layout: { 
       // change position every vertex
@@ -331,28 +330,30 @@ const vao = new VAO(gl, shader, {
 
 ### `VertexIndex`
 
-Draw parts of your vertex buffers:
+Indexes can be used to draw parts of your vertex buffers or reuse vertices multiple times in your geometry:
 
 ```ts
-import { VertexIndex, VertexBuffer } from 'gleasy'
+import { VertexIndex } from 'gleasy'
 
 // create a vertex buffer
 const vertices = new VertexBuffer(gl, array)
 
-// create your index, only draws the first 3 vertices (0, 1, 2)
+// create your index, only drawing the first 3 vertices (0, 1, 2)
 const index = new VertexIndex(gl, new Uint16Array([0, 1, 2]))
 
 shader.use()
+
+// bind and draw the index
 index.bind() 
 index.draw()
 ```
 
-You can also explicitly pass in other typed arrays to the constructor:<br>
+`VertexIndex` can also be used with typed arrays:<br>
 `Uint8Array`, `Uint16Array`, `Uint32Array`, `Uint8ClampedArray`. 
 
 A standard array type will default to a 16-bit unsigned int array (`Uint16Array`). 
 
-The index can also be saved in a `VAO`:
+An index can also be saved in a `VAO`:
 
 ```ts
 const vao = new VAO(gl, {
@@ -406,9 +407,9 @@ vao.draw()
 
 #### Sampler usage:
 
-In fragment shader:
+In the fragment shader:
 
-```
+```glsl
 #version 300 es
 precision highp float;
 uniform sampler2D tex;
@@ -457,11 +458,11 @@ setGLViewport(gl, canvas)
 
 ### Vertex attribute layouts
 
-Attribute layouts can also be described directly on the VertexBuffer and used in draw calls directly, if you really want.
+Attribute layouts can also be described directly on the VertexBuffer and used in draw calls directly, if you don't want to use a VAO.
 
 In your vertex shader:
 
-```
+```glsl
 layout(location=0) in vec3 aPosition;
 layout(location=1) in vec3 aColor;
 ```
@@ -495,10 +496,9 @@ vertices.draw()
 
 * Uniform buffer objects and std140 layouts
 * Transform buffers for use in simulations
-* Instanced rendering
 * Shader includes
 * Some fun examples
 
 ## Contributing
 
-Open to contributions
+Open to contributions!
