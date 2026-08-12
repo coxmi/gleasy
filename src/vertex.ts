@@ -11,6 +11,10 @@ type VertexSchema = {
     buffer?: VertexBuffer
     location?: number
     normalize?: boolean
+    // byte offset into the buffer where this attribute's data starts
+    offset?: number
+    // byte stride between consecutive vertices for this attribute
+    stride?: number
     // two names for divisor, remove this later
     divisor?: number
     step?: number
@@ -222,10 +226,10 @@ function bindVertexLayout(
     parsedLayout: ParsedVertexLayout, 
     program?: WebGLProgram
 ): void {
-    for (const { buffer, stride, layout, divisor } of parsedLayout.bindings) {
+    for (const { buffer, layout, divisor } of parsedLayout.bindings) {
         gl.bindBuffer(gl.ARRAY_BUFFER, buffer.buffer)
         for (const attribute of layout) {
-            const { type, path, location, normalize, row, col, offset } = attribute
+            const { type, path, location, normalize, row, col, offset, stride } = attribute
             const attribLocation = location ?? (program ? gl.getAttribLocation(program, path) : -1)
             if (attribLocation < 0) {
                 console.warn(

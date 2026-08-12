@@ -27,6 +27,8 @@ type ScalarNode<
     [K in T]: {
         type: K,
         buffer?: Binding
+        offset?: number
+        stride?: number
         value?: AttributeValueTypes[K]
     } & InputFields
 }[T]
@@ -70,13 +72,18 @@ export type ParsedAttributeInfo<OutputFields> = {
     col: number
     size: number
     align: number
+    // byte offset into the buffer for this attribute
     offset: number
+    // byte stride between consecutive vertices for this attribute
+    stride: number
 } & OutputFields
 
 
 // layout info, bound to symbol in parsed tree object for use in proxy
 
 const info = Symbol('info')
+const explicitOffset = Symbol('explicitOffset')
+const explicitStride = Symbol('explicitStride')
 
 type ParsedNodeInfo<OutputFields> = {
     [info]: ParsedAttributeInfo<OutputFields>
@@ -150,16 +157,21 @@ function computeLayout<
         const align = ctx.type === 'std140' 
             ? STD140_ALIGN[node.type as keyof typeof STD140_ALIGN]
             : size
+        const offset = (node as ScalarNode<InputFields>).offset
+        const stride = (node as ScalarNode<InputFields>).stride
         const attr: ParsedAttributeInfo<OutputFields> = {
             type: GLSL_TYPES[node.type as keyof typeof GLSL_TYPES],
             path, 
-            offset: binding.stride,
+            offset: offset ?? binding.stride,
             row, 
             col, 
             size,
             align,
+            stride: stride ?? size,
             ...meta(node as ScalarNode<InputFields>, path, binding)
         }
+        if (offset !== undefined) (attr as Record<symbol, boolean>)[explicitOffset] = true
+        if (stride !== undefined) (attr as Record<symbol, boolean>)[explicitStride] = true
         binding.layout.push(attr)
         binding.stride += Math.max(size, alignTo(size, align))
         const scalar = { [info]: attr }
@@ -207,6 +219,18 @@ export function parseLayout<
     const parsed: ParsedLayout<InputFields, OutputFields, BindingFields, L> = { 
         attributes: attributes,
         bindings: [...ctx.bindingInfo.values()],
+    }
+    // attributes with explicit offsets are separate (non-interleaved) streams in the same
+    // buffer, so each has its own stride; otherwise the attributes are interleaved and
+    // share the binding's combined stride. explicit strides are always kept as-is
+    for (const binding of parsed.bindings) {
+        const separateStreams = binding.layout.some(attr => (attr as Record<symbol, boolean>)[explicitOffset])
+        for (const attr of binding.layout) {
+            const explicit = (attr as Record<symbol, boolean>)[explicitStride]
+            delete (attr as Record<symbol, boolean>)[explicitOffset]
+            delete (attr as Record<symbol, boolean>)[explicitStride]
+            if (!explicit) attr.stride = separateStreams ? attr.size : binding.stride
+        }
     }
     return parsed
 }

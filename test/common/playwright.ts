@@ -1,11 +1,59 @@
+import http from 'node:http'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 import fs from 'node:fs'
 import { glob } from 'glob'
 import { chromium } from 'playwright'
+import type { AddressInfo } from 'node:net'
 import type { Browser, Page } from 'playwright'
 import { PNG } from 'pngjs'
 import pixelmatch from 'pixelmatch'
+
+
+const MIME_TYPES: Record<string, string> = {
+    '.html': 'text/html',
+    '.js': 'text/javascript',
+    '.mjs': 'text/javascript',
+    '.css': 'text/css',
+    '.png': 'image/png',
+    '.svg': 'image/svg+xml',
+    '.json': 'application/json',
+    '.glb': 'model/gltf-binary',
+    '.obj': 'text/plain',
+    '.gltf': 'model/gltf+json'
+}
+
+// serves the repo root over http, so examples can fetch assets
+// (fetch() of file:// urls is blocked by the browser)
+async function startServer(root = process.cwd()) {
+    const server = http.createServer((req, res) => {
+        const pathname = decodeURIComponent(new URL(req.url ?? '/', 'http://localhost').pathname)
+        const filePath = path.resolve(root, pathname.replace(/^\/+/, ''))
+        if (!filePath.startsWith(path.resolve(root) + path.sep)) {
+            res.writeHead(403)
+            res.end('Forbidden')
+            return
+        }
+        fs.readFile(filePath, (err, data) => {
+            if (err) {
+                res.writeHead(404)
+                res.end('Not found')
+                return
+            }
+            res.writeHead(200, { 'Content-Type': MIME_TYPES[path.extname(filePath)] ?? 'application/octet-stream' })
+            res.end(data)
+        })
+    })
+    return await new Promise<{ url: (htmlPath: string) => string, close: () => Promise<void> }>(resolve => {
+        server.listen(0, '127.0.0.1', () => {
+            const { port } = server.address() as AddressInfo
+            resolve({
+                url: (htmlPath) => `http://127.0.0.1:${port}/${path.relative(root, htmlPath).split(path.sep).join('/')}`,
+                close: () => new Promise<void>(r => server.close(() => r()))
+            })
+        })
+    })
+}
 
 
 export async function createBrowser(debug = false) {
@@ -98,6 +146,7 @@ async function pngFromFile(file: string) {
 
 export async function updateScreenshots(whitelist?: string[]) {
     const browser = await createBrowser()
+    const server = await startServer()
 
     const htmlFiles = glob.sync('examples/*/*.html').filter(filepath => {
         if (!whitelist?.length) return true
@@ -114,7 +163,7 @@ export async function updateScreenshots(whitelist?: string[]) {
         const screenshot = path.join(process.cwd(), 'test/screenshots/', `${example.screenshotBase}.png`)
         const page = await newPage(browser)
         try {
-            const png = await renderScene({ page, url: pathToFileURL(example.path).href })
+            const png = await renderScene({ page, url: server.url(example.path) })
             await writePng(png, screenshot)
         } catch(e) {
             console.error('failed:', htmlFile)
@@ -127,6 +176,7 @@ export async function updateScreenshots(whitelist?: string[]) {
     })
     await Promise.all(processes)
     await browser.close()
+    await server.close()
 }
 
 
@@ -134,7 +184,8 @@ export async function compareWithScreenshot(
     browser: Browser, 
     htmlPath: string, 
     screenshotPath: string, 
-    diffPath: string
+    diffPath: string,
+    url?: string
 ) {
     const name = path.relative(process.cwd(), htmlPath).replace(/\/index\.html$/, '')
     const diffName = path.relative(process.cwd(), diffPath)
@@ -145,7 +196,7 @@ export async function compareWithScreenshot(
     const page = await newPage(browser)
     let png: PNG
     try {
-        png = await renderScene({ page, url: pathToFileURL(htmlPath).href })
+        png = await renderScene({ page, url: url ?? pathToFileURL(htmlPath).href })
     } catch(e) {
         await page.close()
         // stacks are just from playwright, so just throw a simple message instead
@@ -195,6 +246,7 @@ export function getExampleInfo(htmlFile: string) {
 
 export async function compareExamplesWithScreenshots(whitelist?: string[]) {
     const browser = await createBrowser()
+    const server = await startServer()
     const exampleHtmlFiles = glob.sync('examples/*/*.html').filter(filepath => {
         if (!whitelist?.length) return true
         return whitelist.some(w => filepath.includes(w))
@@ -209,16 +261,18 @@ export async function compareExamplesWithScreenshots(whitelist?: string[]) {
         const example = getExampleInfo(htmlFile)
         const screenshotPath = path.join(process.cwd(), 'test/screenshots/', `${example.screenshotBase}.png`)
         const diffPath = path.join(process.cwd(), 'test/diffs/', `${example.screenshotBase}.png`)
-        return await compareWithScreenshot(browser, htmlFile, screenshotPath, diffPath)
+        return await compareWithScreenshot(browser, htmlFile, screenshotPath, diffPath, server.url(htmlFile))
     })
 
     try {
         await Promise.all(processes)    
     } catch(e) {
         await browser.close()
+        await server.close()
         throw e
     }
     await browser.close()
+    await server.close()
     return true
 }
 

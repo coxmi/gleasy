@@ -4,16 +4,20 @@ import { updateScreenshots, getExampleInfo } from '../test/common/playwright.ts'
 // npm run screenshots {searchterm} or
 // npm run screenshots all
 
-const colors = new Proxy({
-	reset: '\x1b[0m',
-	green: '\x1b[32m',
-	yellow: '\x1b[33m',
-	red: '\x1b[31m',
-	cyan: '\x1b[36m',
-	dim: '\x1b[2m'
-}, {
+const colorEsc = {
+    reset: '\x1b[0m',
+    green: '\x1b[32m',
+    yellow: '\x1b[33m',
+    red: '\x1b[31m',
+    cyan: '\x1b[36m',
+    dim: '\x1b[2m'
+}
+
+const colors = new Proxy(colorEsc, {
 	get: (target, prop) => {
-		if (process.stdout.isTTY) return target[prop]
+		if (process.stdout.isTTY && prop in target) {
+            return target[prop as keyof typeof target]
+        }
 		return ''
 	}
 })
@@ -51,14 +55,14 @@ function main() {
     console.log(`${colors.yellow}→${colors.reset} Press ${colors.yellow}enter${colors.reset} to create screenshots for:`)
     const pad = htmlFiles.length > 9 ? 2 : 1
     htmlFiles.map((file, index) => {
-    	const number = (index + '').padStart(pad, '0')
+    	// const number = (index + '').padStart(pad, '0')
     	const info = getExampleInfo(file)
     	console.log(`${colors.green} - ${info.name}${colors.reset}`)
     })
 
     promptOpen(async () => {
      	await updateScreenshots(htmlFiles)
-     	const plural = arr => arr.length === 1 ? '' : 's'
+     	const plural = (arr: string[]) => arr.length === 1 ? '' : 's'
      	console.log(`created ${htmlFiles.length} screenshot${plural(htmlFiles)}`)
     })
 }

@@ -34,13 +34,17 @@
     "build": "npm run types && node build.js && npm run size",
     "ci": "npm run types && node build.js && npm run test",
     "screenshots": "node --require ts-node/register tools/update-screenshots.ts",
-    "size": "node --require ts-node/register tools/readme-size.ts"
+    "size": "node --require ts-node/register tools/readme-size.ts",
+    "mesh": "node --require ts-node/register tools/mesh.ts",
+    "examples": "npx serve ./examples -l 9157"
   },
   "devDependencies": {
-    "esbuild": "^0.27.2",
+    "@gltf-transform/cli": "^4.3.0",
     "@types/node": "^25.3.0",
     "@types/pngjs": "^6.0.5",
+    "esbuild": "^0.27.2",
     "glob": "^13.0.6",
+    "obj2gltf": "^3.2.0",
     "pixelmatch": "^7.1.0",
     "playwright": "^1.58.2",
     "pngjs": "^7.0.0",
